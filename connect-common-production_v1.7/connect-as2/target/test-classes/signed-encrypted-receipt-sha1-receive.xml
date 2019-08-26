@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    
+    <as2:config name="AS2_Receive_Signed_Encrypt_ReceiptSHA1_Configuration" httpEndpointRef="HTTP_AS2_Signed_Encrypt_ReceiptSHA1_Receive_EndPoint" doc:name="AS2_Receive_Signed_Encrypt_ReceiptSHA1: Configuration" doc:description="AS2 receive configuration for Signed_Encrypt_ReceiptSHA1"/>
+    <http:endpoint exchange-pattern="request-response" host="0.0.0.0" port="${connect.as2.signed.encryped.receipt-sha1.receive.http.port}"   
+    method="POST" name="HTTP_AS2_Signed_Encrypt_ReceiptSHA1_Receive_EndPoint" doc:name="HTTP" 
+    responseTimeout="${connect.as2.signed.encryped.receipt-sha1.receive.http.timeout}" 
+    path="${connect.as2.receive.http.path}" connector-ref="HTTP_Signed_Encrypt_Receipt_Receive"/>
+    <http:connector name="HTTP_Signed_Encrypt_Receipt_Receive" cookieSpec="netscape" 
+    validateConnections="true" 
+    sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" 
+    serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS"/>
+        	
+    <flow name="signed-encrypt-receiptSHA1-receive-flow">
+        <as2:receive config-ref="AS2_Receive_Signed_Encrypt_ReceiptSHA1_Configuration" doc:name="AS2 - Signed Encrypted Receipt SHA1 - Receive (Streaming)"   keyStorePath="${connect.as2.signed.encryped.receipt-sha1.receive.keyStorePath}"    invokeFlowBeforeSendReceipt="before-send-receipt-flow" keyStorePassword="${connect.as2.signed.encryped.receipt-sha1.receive.keyStorePassword}" preferredDigestAlgorithm="sha1" receiptSubject="Receipt Message from Connect" requireSenderEncrypts="true" requireSenderSigns="true"/>
+		<connectlogger:info config-ref="Connectlogger__Configuration" logMessage="AS2 messge from #[flowVars[AS2Constants.VAR_SOURCE_SYSTEM]] is successfully decrypted, verified and sent MDN back.  Forwarded the request to API Manager Component successfully" processState="200009150" doc:name="Log - Success Message - Details"/>
+		<connectlogger:info config-ref="Connectlogger__Configuration" logMessage="connect-as2 message processing completed for inbound" processState="200009160" doc:name="Log - Success Message"/>
+		<exception-strategy ref="globalChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+      
+</mule>

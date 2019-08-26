@@ -1,0 +1,5 @@
+com\redn\connect\as2\processor\CreateConnectEnterpriseMessageProcessor.class
+com\redn\connect\as2\constants\AS2Constants.class
+com\redn\connect\as2\processor\ValidateAndBuildTargetSystemFlowProcessor.class
+com\redn\connect\as2\processor\DeriveSourceSystemProcessor.class
+com\redn\connect\as2\processor\ValidateResponseFromTargetSystemProcessor.class

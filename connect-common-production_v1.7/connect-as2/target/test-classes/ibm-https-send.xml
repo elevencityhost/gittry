@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:https="http://www.mulesoft.org/schema/mule/https" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+ 
+    <https:endpoint exchange-pattern="request-response" host="${connect.as2.ibm.send.https.host}" port="${connect.as2.ibm.send.https.port}" path="${connect.as2.ibm.send.https.path}" connector-ref="HTTPS_IBM_Send" method="POST" name="HTTPS_AS2_Send_IBM_EndPoint" responseTimeout="${connect.as2.ibm.send.https.response.timeout}" doc:name="HTTPS" doc:description="HTTPS endpoint for sending to IBM">
+        <reconnect frequency="${connect.as2.ibm.send.https.reconnection.frequency}" count="${connect.as2.ibm.send.https.reconnection.attempts}"/>
+    </https:endpoint>
+    <https:connector name="HTTPS_IBM_Send" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="${connect.as2.ibm.send.https.connection.clientSoTimeout}" serverSoTimeout="${connect.as2.ibm.send.https.connection.serverSoTimeout}" socketSoLinger="0" connectionTimeout="${connect.as2.ibm.send.https.connection.timeout}" doc:name="HTTP-HTTPS"  doc:description="HTTPS conector for IBM">
+    	<https:tls-server path="${connect.as2.ibm.httpsKeyStorePath}" storePassword="${connect.as2.ibm.httpsKeyStorePassword}"/>
+    </https:connector>
+    <as2:config name="AS2_Send_IBM_HTTPS_Configuration" httpEndpointRef="HTTPS_AS2_Send_IBM_EndPoint" doc:name="AS2: HTTPS Configuration" doc:description="AS2 HTTPS Configuration for IBM"/>
+
+    <flow name="ibm-send-flow" doc:description="This flow is used to send outbound AS2 messages to IBM using AS2 connector and validates the response from IBM">
+    	<as2:send config-ref="AS2_Send_IBM_HTTPS_Configuration" as2From="${connect.as2.ibm.send.from}" as2To="${connect.as2.ibm.send.to}" keyStorePath="${connect.as2.ibm.as2KeyStorePath}" keyStorePassword="${connect.as2.ibm.as2KeyStorePassword}" requestReceipt="signed" sign="true" encrypt="true" doc:name="AS2 - IBM - Send" contentType="${connect.as2.ibm.send.contentType}" receiptTimeout="${connect.as2.ibm.send.receiptTimeout}" subject="${connect.as2.ibm.send.subject}" messageId="#[flowVars[ConnectConstants.VAR_MESSAGE_ID]]"/>
+        <flow-ref name="subValidateResponseFromTargetSystem" doc:name="subValidateResponseFromTargetSystem" doc:description="calls the flow to validate the response from IBM"/>
+        <catch-exception-strategy doc:name="ibm-send-Catch_Exception_Strategy" doc:description="handles in case of exception in sending AS2 message to IBM">
+
+            <expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=AS2Constants.ERROR_CODE_IBM_AS2_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]="Error in communicating with IBM AS2: " +  exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=AS2Constants.CONST_EXCEPTION_ORIGIN_IBM_AS2_HTTPS;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;]]>
+            </expression-component>
+            <flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" doc:description="calls the flow to prepare EE and send to CEH"/>
+
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

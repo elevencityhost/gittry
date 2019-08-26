@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:https="http://www.mulesoft.org/schema/mule/https" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd">
+    <http:endpoint exchange-pattern="request-response" host="${connect.as2.redhat.send.http.host}" port="${connect.as2.redhat.send.http.port}" path="${connect.as2.redhat.send.http.path}" connector-ref="HTTP_RedHat_Send" method="POST" name="HTTP_AS2_Send_RedHat_EndPoint" responseTimeout="${connect.as2.redhat.send.http.timeout}" doc:name="HTTP"/>
+    <http:connector name="HTTP_RedHat_Send" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS"/>
+    <as2:config name="AS2_Send_RedHat_HTTP_Configuration" httpEndpointRef="HTTP_AS2_Send_RedHat_EndPoint" doc:name="AS2: Configuration"/>
+
+    <sub-flow name="redhat-http-send-flow">
+    	<as2:send config-ref="AS2_Send_RedHat_HTTP_Configuration" as2From="${connect.as2.redhat.send.from}" as2To="${connect.as2.redhat.send.to}" keyStorePath="${connect.as2.redhat.send.keyStorePath}" keyStorePassword="${connect.as2.redhat.send.keyStorePassword}" requestReceipt="signed" sign="true" encrypt="true" doc:name="AS2 - RedHat - Send" contentType="${connect.as2.redhat.send.contentType}" receiptTimeout="${connect.as2.redhat.send.receiptTimeout}" subject="${connect.as2.redhat.send.subject}"/>
+    </sub-flow>
+</mule>

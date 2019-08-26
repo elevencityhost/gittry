@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="9091" doc:name="HTTP Listener Configuration"/>
+    <flow name="test-flowFlow">
+        <file:inbound-endpoint path="Input" responseTimeout="10000" doc:name="File"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <expression-component doc:name="Expression Component"><![CDATA[import com.redn.connect.util.ConnectUtils;
+import com.redn.connect.vo.ConnectEnterpriseMessage;
+
+
+ConnectUtils utils1 = new ConnectUtils();
+ConnectEnterpriseMessage cem = utils1.buildConnectEnterprsieMessage(payload);
+cem.getEnterpriseHeader().setTargetSystem("test");
+cem.getEnterpriseHeader().setMessageId("TestMessageID");
+
+payload = cem;
+
+]]>
+        	
+        </expression-component>
+        <logger message="Read Enterprise Message: #[payload]" level="INFO" doc:name="Logger"/>
+
+        <set-property propertyName="serviceName" value="o3klen002" doc:name="set selector key property"/>
+        <jms:outbound-endpoint topic="VirtualTopic.DL-TOPIC" connector-ref="activeMQGlblConn" doc:name="JMS"/>
+    </flow>
+    <flow name="test-flowFlow1">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/" doc:name="HTTP"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="This is HTTP Connect, Received Request from Lenovo #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>
