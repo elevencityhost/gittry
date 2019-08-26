@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    
+    <http:request-config name="HTTP_Request_Configuration_ConnectAPIManager" host="${connect.as2.connect-api-manager.host}" port="${connect.as2.connect-api-manager.port}"  doc:name="HTTP Request Configuration"  doc:description="HTTP Request Configuration for API Manager"/>
+    <flow name="call-connect-api-manager-flow" doc:description="This flow is used to call API Manager. If the call to API Manager is successful, then 'isAPIManagerCallSuccessful' variable value is set to 'true'. In case of exception in calling API Manager 'isAPIManagerCallSuccessful' variable value is set to 'false' and Enterprise Exception is created and sent to CEH">
+   		<http:request config-ref="HTTP_Request_Configuration_ConnectAPIManager"
+   					  path="${connect.as2.connect-api-manager.path}" method="POST" 
+   					  doc:name="Call ConnectAPIManager" 
+   					  doc:description="Makes call to Conenct API Manager component"/>
+        <set-variable variableName="#[AS2Constants.VAR_IS_APIMGR_CALL_SUCCESS]" value="#[true]" doc:name="set api manager call as succcess" doc:description="sets api manager call status as success"/>
+   		<catch-exception-strategy doc:name="call-connect-api-manager-Catch_Exception_Strategy">
+
+            <expression-component doc:name="set exception properties" doc:description="sets properties required to build CE"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=AS2Constants.ERROR_CODE_CONNECT_API_MANAGER_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]="Error in communicating with Connect API Manager: " +  exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_API_MANAGER;
+flowVars[AS2Constants.VAR_IS_APIMGR_CALL_SUCCESS]=false;
+flowVars[ConnectConstants.VAR_RETRYABLE]=false;]]>
+            </expression-component>
+            <flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" doc:description="calls prepareEEandSendToCEHflow flow"/>
+
+        </catch-exception-strategy>
+    </flow>
+</mule>

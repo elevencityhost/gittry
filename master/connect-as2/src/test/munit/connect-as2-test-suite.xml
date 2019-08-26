@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    <context:property-placeholder location="connect_config_as2.properties"/>
+    <munit:config   name="munit" doc:name="Munit configuration" mock-connectors="false">
+    </munit:config>
+    <spring:beans>
+        <spring:import resource="classpath:call-connect-http.xml"/>
+        <spring:import resource="classpath:connect-as2-receive.xml"/>
+        <spring:import resource="classpath:connect-as2-send.xml"/>
+        <spring:import resource="classpath:exception-handler.xml"/>
+        <spring:import resource="classpath:global-configurations.xml"/>
+        <spring:import resource="classpath:global-connectors.xml"/>
+        <spring:import resource="classpath:lenovo-https-send.xml"/>
+        <spring:import resource="classpath:redhat-https-send.xml"/>
+        <spring:import resource="classpath:signed-encrypted-receipt-sha1-receive.xml"/>
+        
+        <spring:bean id="springBuildCEMBeanId" name="springBuildCEMBean"
+			class="com.redn.connect.as2.test.util.BuildCEM">
+		</spring:bean>
+		
+    </spring:beans>
+    <munit:test name="connect-as2-test-suite-mainConnectAS2SendflowTest" description="Test">
+        <mock:when messageProcessor=".*:.*" doc:name="Mock CEH" >
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="Send Exception to CEH"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+
+
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Mock Lenovo AS2 Send Connector">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['AS2 - Lenovo - Send']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+
+        </mock:when>
+        <set-payload value="#[com.redn.connect.as2.test.util.FileUtil.readFile(&quot;CEnterpriseMessages.xml&quot;)]" doc:name="Set Payload"/>
+       <component doc:name="builds CEM" doc:description="builds CEM">
+            <spring-object bean="springBuildCEMBean"/>
+
+        </component>
+        
+        <flow-ref name="mainConnectAS2Sendflow" doc:name="mainConnectAS2Sendflow"/>
+        <mock:verify-call messageProcessor=".*:.*" doc:name="Verify Call to lenovo AS2 connector">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['AS2 - Lenovo - Send']"/>
+            </mock:with-attributes>
+
+
+        </mock:verify-call>
+    </munit:test>
+</mule>
