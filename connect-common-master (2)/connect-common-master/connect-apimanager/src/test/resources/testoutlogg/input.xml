@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns2:ConnectEnterpriseMessage xmlns:ns2="http://schemas.connect.com/enterprise/services/2014/05" xmlns="http://schemas.connect.com/enterprise/services/2016/11">
+   <ns2:EnterpriseHeader>
+      <ns2:MessageId>a1a0d517-bf6c-4c44-94ed-2fc3df20ab06</ns2:MessageId>
+      <ns2:CreatedUtc>2016-12-01T15:45:05.845+05:30</ns2:CreatedUtc>
+      <ns2:SourceSystem>LENOVO</ns2:SourceSystem>
+      <ns2:TargetSystem />
+      <ns2:PartnerId />
+      <ns2:ServiceName />
+      <ns2:Action>AS2</ns2:Action>
+      <ns2:Priority>5</ns2:Priority>
+   </ns2:EnterpriseHeader>
+   <ns2:EnterpriseBody>
+      <payload xmlns="" xmlns:ns3="http://schemas.connect.com/enterprise/services/2016/11" xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">UNA:+.? ' UNB+UNOC:3+IBMGPOH1:ZZ+662424795TEST:16+160330:1416+IG-62779496' UNH+80534414+ORDCHG:D:97A:UN' BGM+220+20160330+4' DTM+69:20150501150000UTC?+12:304' FTX+SSR+++dd:Blank' FTX+AAR++ST' FTX+COI+++CLW' FTX+PRI++8' FTX+DEL++06' FTX+CUR+++Pack all item into one box' FTX+DIN+++make a call to customer before delivery' FTX+PRD+++1:1:PC01' RFF+PC:20AMS67000' RFF+SE:PC01K33E' RFF+SZ:ND' RFF+ABO:Y' RFF+CO:IBM1234501' DTM+4:20150501010101UTC?+12:304' RFF+ACW:CASE_12345' RFF+ADG:Y' RFF+ACH:Y' RFF+ZOD:order_desk01' RFF+ZSD:IBM' RFF+ZPD:1030001325' RFF+ZCS:Blank' RFF+ZZZ' NAD+SE+30001234++IBM' NAD+BY+US00000001++Coca Cola:CA+9/F:841 WEBSTER ST:stress 3:Blank+SAN FRANCISCO++94117+US' CTA+PD+:Jordan Surzyn' COM+Minako@DHL.com:EM' COM+6508624654:TE' NAD+OY+US00000001++IBM Field Service:CA+9/F:900 WEBSTER ST:stress 3:Blank+SAN FRANCISCO++94117+US' CTA+CR+:Will Smith' COM+Will@ibm.com:EM' COM+6508624654:TE' LIN+10' PIA+5+00HM083' IMD+F++:::KEYBOARD NetVista Keyboard (USB)' QTY+21:1:EA' DTM+69:20160610120000UTC?+12:304' FTX+OSI+++INW' FTX+LIN+++ZSP1' FTX+CHG+++ADD:Add new item' FTX+ZCT+++STO from DC to FSL' RFF+ZSB:01' RFF+ZRO:Y' RFF+ZOR:KEYBOARD in good condition' RFF+ZST:SOFT' UNS+S' UNT+49+80534414' UNZ+1+IG-62779496'</payload>
+   </ns2:EnterpriseBody>
+</ns2:ConnectEnterpriseMessage>

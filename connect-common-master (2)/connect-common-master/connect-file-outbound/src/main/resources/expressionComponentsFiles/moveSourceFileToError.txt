@@ -1,0 +1,8 @@
+import java.io.File;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+	File sourceFile = new File(sessionVars.sourceAbsoluteFilePath);
+	flowVars.errorFileName = sessionVars.sourceAbsoluteFilePath+".error";
+	flowVars.errorFileStatus = sourceFile.renameTo(new File(flowVars.errorFileName));

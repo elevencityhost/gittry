@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    
+    <choice-exception-strategy name="sapgw-common-global-exceptionhandlerChoice_Exception_Strategy">
+        <catch-exception-strategy when="#[exception.causedBy(org.mule.api.routing.filter.FilterUnacceptedException)]" doc:name="Filtter_Unaccepted_Exception">
+            <flow-ref name="FiltterUnaccepted-exception-handlerSub_Flow" doc:name="FiltterUnaccepted-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Other _Exception handler sub flow ">
+            <flow-ref name="Other-exception-handlerSub_Flow" doc:name="Other-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+     <sub-flow name="FiltterUnaccepted-exception-handlerSub_Flow">
+        <expression-component doc:name="SetErrorCode"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=Connect2sapCommonConstants.ERROR_CODE_FILTER_UNACCEPTED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=ConnectConstants.CONST_MESSAGE_ENTERPRISE_MESSAGE_VALIDATION_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]></expression-component>
+        <flow-ref name="CreateEnterpriseExceptionMessage" doc:name="CreateEnterpriseExceptionMessage"/>
+    </sub-flow>
+    
+    <sub-flow name="Other-exception-handlerSub_Flow">
+        <expression-component doc:name="SetErrorCode"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=Connect2sapCommonConstants.ERROR_CODE_OTHER;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]></expression-component>
+        <flow-ref name="CreateEnterpriseExceptionMessage" doc:name="CreateEnterpriseExceptionMessage"/>
+    </sub-flow>
+    
+     <sub-flow name="CreateEnterpriseExceptionMessage">
+         <connectlogger:error config-ref="ConnectloggerConn" logMessage="#[flowVars[Connect2sapCommonConstants.VAR_ERROR_DESCRIPTION]]" processState="#[flowVars[Connect2sapCommonConstants.VAR_ERROR_CODE]]" doc:name="Connectlogger"/>
+        <custom-transformer class="com.redn.connect.transformer.CreateXMLEnterpriseExceptionTransformer" doc:name="CreateXMLEnterpriseExceptionTransformer"/>
+        <jms:outbound-endpoint queue="${connect.connect2sap.common.geh.queuename}" connector-ref="Connect2sapCommonActiveMqConn" doc:name="JMS"/>
+        <connectlogger:error config-ref="ConnectloggerConn" logMessage="successfully connect2sap error send to CEH" processState="400010150" doc:name="Connectlogger"/>
+    </sub-flow>
+</mule>

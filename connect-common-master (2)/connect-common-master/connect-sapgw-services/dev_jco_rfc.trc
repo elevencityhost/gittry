@@ -1,0 +1,51 @@
+
+**** Error file opened at 20170427 183513 India Standard Time Rel. 3.0.15 (2016-07-26) [721.713]
+Error:  >Thu Apr 27 18:35:13,704<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTSIT from host ??? not allowed
+TIME        Thu Apr 27 17:05:13 2017
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     5664
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+
+**** Error file opened at 20170427 184033 India Standard Time Rel. 3.0.15 (2016-07-26) [721.713]
+Error:  >Thu Apr 27 18:40:33,513<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTSIT from host ??? not allowed
+TIME        Thu Apr 27 17:10:33 2017
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     5682
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+Error:  >Thu Apr 27 18:40:34,230<    
+>RfcIoException:
+    message: no message received
+    Return code: RFCIO_ERROR_SYSERROR(5)<
+
+
+Error: [4] >Thu Apr 27 18:40:34,230<    RfcException raised by system [IBSHYDNB6037|RFCCNCTSIT]:
+    message: no message received
+    return code: RFC_FAILURE (1)
+    error group: 102
+    key: RFC_ERROR_COMMUNICATION

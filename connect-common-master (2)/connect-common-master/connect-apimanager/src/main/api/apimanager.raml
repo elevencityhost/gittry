@@ -1,0 +1,31 @@
+#%RAML 0.8
+---
+title: connectApiManager
+version: v1.0
+baseUri: http://localhost:8081/{title}
+/messaging:
+  post:
+    description: route Enterprise Messages
+    body:
+      text/xml:
+        schema: !include schemas/ConnectEnterpriseMessage.xsd
+        
+    responses:
+      200:
+        description: Enterprise Message successfully routed
+        body:
+          text/xml:
+            schema: !include schemas/ConnectEnterpriseResponse.xsd
+      400:
+        description: Bad request
+        body:
+          text/xml:
+            schema: !include schemas/ConnectEnterpriseException.xsd
+          
+      500:
+        description: Enterprise Exception occurred
+        body:
+          text/xml:
+            schema: !include schemas/ConnectEnterpriseException.xsd
+          
+            

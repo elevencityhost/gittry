@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+    <choice-exception-strategy name="global-exception-handlerChoice_Exception_Strategy">
+        <catch-exception-strategy doc:name="Filtter_Unaccepted_Exception" when="#[exception.causedBy(org.mule.api.routing.filter.FilterUnacceptedException)]">
+            <flow-ref name="FiltterUnaccepted-exception-handlerSub_Flow" doc:name="FiltterUnaccepted-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="JMS-exception-handlerSub_Flow" when="#[exception.causedBy(javax.jms.JMSException)]">
+            <flow-ref name="JMS-exception-handlerSub_Flow" doc:name="JMS-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+
+          <catch-exception-strategy when="#[exception.causedBy(com.redn.connect.exception.ConnectException)]" doc:name="connectExceptionCatchExceptionStrategy">
+            <flow-ref name="subHandelConnectEnterpriseFlow" doc:name="subHandelConnectEnterpriseFlow"/>
+          </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Other _Exception handler sub flow " when="#[exception.causedBy(org.mule.api.routing.RoutingException)]">
+            <flow-ref name="Other-exception-handlerSub_Flow" doc:name="Other-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+
+    
+    <sub-flow name="createEnterpriseExceptionMessage" >
+        <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="Error log message in sap2connect : #[flowVars[SAP2ConnectConstants.VAR_ERROR_DESCRIPTION]]" processState="#[flowVars[SAP2ConnectConstants.VAR_ERROR_CODE]]" doc:name="Connectlogger"/>
+        <custom-transformer class="com.redn.connect.transformer.CreateXMLEnterpriseExceptionTransformer" doc:name="Create XML Enterprise Exception" doc:description="Creates an Enterprise Exception Java object using the JAXB generated POJO"/>
+
+        <jms:outbound-endpoint queue="${sap2connect.common.exception.queue.name}" connector-ref="sap2connectCommonActiveMQConn" doc:name="Send Exception to CEH" doc:description="Route Enterprise Exception Message to Global Exception Handler queue."/>
+        <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="successfully sap2connect common error send to CEH" processState="400011150" doc:name="Connectlogger"/>
+	</sub-flow>
+	 <sub-flow name="FiltterUnaccepted-exception-handlerSub_Flow">
+        <expression-component doc:name="SetErrorCode"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=SAP2ConnectConstants.ERROR_CODE_FILTER_UNACCEPTED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=ConnectConstants.CONST_MESSAGE_ENTERPRISE_MESSAGE_VALIDATION_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]></expression-component>
+        <flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage"/>
+    </sub-flow>
+    
+     <sub-flow name="JMS-exception-handlerSub_Flow">
+        <expression-component doc:name="SetErrorCode"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=SAP2ConnectConstants.ERROR_CODE_JMS;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_ACTIVEMQ;]]></expression-component>
+        <flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage"/>
+    </sub-flow>
+
+    <sub-flow name="subHandelConnectEnterpriseFlow">
+        <expression-component doc:name="set ErrorCode"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=SAP2ConnectConstants.ERROR_CODE_FILE_SIZE;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=SAP2ConnectConstants.ERROR_DESCRIPTION_FILE_SIZE;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=exception.getCauseException().getOrigin();]]></expression-component>
+        <flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage"/>
+    </sub-flow>
+ <sub-flow name="Other-exception-handlerSub_Flow">
+        <expression-component doc:name="SetErrorCode"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=SAP2ConnectConstants.ERROR_CODE_OTHER;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]></expression-component>
+        <flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage"/>
+    </sub-flow>
+    
+</mule>

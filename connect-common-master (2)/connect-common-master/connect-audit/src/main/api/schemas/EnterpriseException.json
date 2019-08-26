@@ -1,0 +1,76 @@
+{
+                "type":"object",
+                "$schema": "http://json-schema.org/draft-03/schema",
+                "id": "http://jsonschema.net",
+                "required":false,
+                "properties":{
+                  "enterpriseException": {
+                    "type":"object",
+                    "id": "http://jsonschema.net/enterpriseException",
+                    "required":true,
+                    "properties":{
+                      "category": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/category",
+                        "required":false
+                      },
+                      "createdUtc": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/createdUtc",
+                        "required":false
+                      },
+                      "description": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/description",
+                        "required":false
+                      },
+                      "details": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/details",
+                        "required":false
+                      },
+                      "errorCode": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/errorCode",
+                        "required":false
+                      },
+                      "exceptionId": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/exceptionId",
+                        "required":false
+                      },
+                      "machine": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/machine",
+                        "required":false
+                      },
+                      "messageId": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/messageId",
+                        "required":false
+                      },
+                      "resourceId": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/resourceId",
+                        "required":false
+                      },
+                      "resourceName": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/resourceName",
+                        "required":false
+                      },
+                      "retriable": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/retriable",
+                        "required":false
+                      },
+                      "service": {
+                        "type":"string",
+                        "id": "http://jsonschema.net/enterpriseException/service",
+                        "required":false
+                      },
+                      "originalMessage": {}
+                    }
+                  }
+                }
+              }

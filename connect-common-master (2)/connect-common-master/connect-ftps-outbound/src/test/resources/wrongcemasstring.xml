@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ConnectEnterpriseMessage
+	xmlns="http://schemas.connect.com/enterprise/services/2014/05"
+	xmlns:ns2="http://schemas.connect.com/enterprise/services/2016/11">
+	<EnterpriseHeader1>
+		<CreatedUtc xsi:nil="true"
+			xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" />
+		<TargetSystem>nbd</TargetSystem>
+		<ServiceName>o1knbd001</ServiceName>
+		<Component>connect-ftps-outbound</Component>
+		<Custom>
+			<customProps>
+				<Contents>
+					<Name>attachmentPath</Name>
+					<Value>E:\FILE_PROTOCOLS\NBD001_Staging\ENBD_0000000001235027_2017-08-03-160846.xml</Value>
+				</Contents>
+			</customProps>
+		</Custom>
+	</EnterpriseHeader1>
+	<EnterpriseBody>
+		<payload xmlns=""
+			xmlns:ns3="http://schemas.connect.com/enterprise/services/2014/05" />
+	</EnterpriseBody>
+</ConnectEnterpriseMessage>

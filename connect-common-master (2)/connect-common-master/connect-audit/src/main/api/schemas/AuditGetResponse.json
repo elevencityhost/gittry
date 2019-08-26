@@ -1,0 +1,78 @@
+{
+	"type":"object",
+	"$schema": "http://json-schema.org/draft-03/schema",
+	"id": "http://jsonschema.net",
+	"required":false,
+	"properties":{
+		"auditGetResponse": {
+			"type":"array",
+			"id": "http://jsonschema.net/auditGetResponse",
+			"required":true,
+			"items":
+				{
+					"type":"object",
+					"id": "http://jsonschema.net/auditGetResponse/0",
+					"required":false,
+					"properties":{
+						"batch_counter": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/batch_counter",
+							"required":false
+						},
+						"comment": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/comment",
+							"required":false
+						},
+						"external_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/external_id",
+							"required":false
+						},
+						"interface_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/interface_id",
+							"required":false
+						},
+						"job_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/job_id",
+							"required":false
+						},
+						"phase_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/phase_id",
+							"required":false
+						},
+						"prop_name": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/prop_name",
+							"required":false
+						},
+						"prop_value": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/prop_value",
+							"required":false
+						},
+						"status_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/status_id",
+							"required":false
+						},
+						"system_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/system_id",
+							"required":false
+						},
+						"created_dt": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditGetResponse/0/system_id",
+							"required":false
+						}
+					}
+				}
+			
+
+		}
+	}
+}

@@ -1,0 +1,393 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+      xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ftp="http://www.mulesoft.org/schema/mule/ee/ftp" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:spring="http://www.springframework.org/schema/beans" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/ftp http://www.mulesoft.org/schema/mule/ee/ftp/current/mule-ftp-ee.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+   
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-fileoutbound-logger" doc:name="Connectlogger: Configuration"/>
+
+  
+    <flow name="connect-fileoutgwFlow">
+        <jms:inbound-endpoint  connector-ref="Active_MQ" doc:name="Queue-FileOutbound" doc:description="The JMS Topic is Triggered to recieve the Messages" queue="${connect.fileoutgw.queue}"/>
+
+        <choice doc:name="Check Payload Type">
+        	<when expression="#[payload instanceof java.lang.String  &amp;&amp;  null != payload]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received java.lang.String  As Payload Converting To CEM Object" processState="102010210" doc:name="Connectlogger-Log"/>
+                <set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]" doc:name="Set CEM Object As Payload"/>
+
+        	</when>
+        	<otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="::: connect-connect2sap Received Payload is" processState="102010220" doc:name="Connectlogger"/>
+        	
+        	</otherwise>
+        </choice>
+
+        <set-variable variableName="#[ConnectConstants.VAR_ENTERPRISE_MESSAGE]" value="#[payload]" doc:name="store CEM"/>
+        <component class="com.redn.connect.ftp.util.CEMProcessor" doc:name="CEMProcessor" doc:description="Java class for CEMProcessor"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: payload entered in the file outbound  flow as ::   #[message]" processState="102012100" doc:name="Connectlogger"/>
+
+
+
+        <set-variable variableName="propertyFileNameVar" value="connect_config_#[flowVars.interfacename]_#[flowVars.ftpname].properties" doc:name="Flowvar_propertyFileNameVar" doc:description="Sets the property file name "/>
+        <enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102012960" doc:name="Connectlogger-LogCEM"/>
+
+        </enricher>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Property file name came from  file outbound  #[flowVars.propertyFileNameVar]" processState="102012110" doc:name="Connectlogger"/>
+
+        <flow-ref name="Load_Properties" doc:name="Load_Properties" doc:description=" Load he properties flow is been refered"/>
+        <flow-ref name="FlowVars_Setup" doc:name="FlowVars_Setup" doc:description="The flowVars_Setup flow is been referred to setup the flowVars"/>
+        <flow-ref name="process-each-file" doc:name="process-each-file" doc:description="the process each file flow is been referred"/>
+          <enricher target="#[flowVars.emailSendFlowExecuted]" doc:name="Message Enricher">
+            <async doc:name="Async">
+                <flow-ref name="connect-send_email_subflow" doc:name="connect-send_email_subflow"/>
+            </async>
+        </enricher>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="SFTP Gateway interface completed" processState="402012130" doc:name="Connectlogger"/>
+
+
+        <exception-strategy ref="globalChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+
+
+    </flow>
+
+     <sub-flow name="Load_Properties">
+        <component class="com.redn.connect.ftp.transformers.FTPConnectConfig" doc:name="load-destination-configuration-properties" doc:description="Java class to Load Destination configuratio properties "/>
+    </sub-flow>
+    <sub-flow name="FlowVars_Setup">
+    
+    
+<!--         <set-variable variableName="prp_host" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.host&quot;)]" doc:name="Flowvar_prp_host"/>
+
+        <set-variable variableName="prp_port" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.port&quot;)]" doc:name="Flowvar_prp_port"/>
+        
+        
+        <set-variable variableName="prp_user" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.trg.user&quot;)]" doc:name="Flowvar_prp_user"/>
+        <set-variable variableName="prp_password" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.trg.password&quot;)]" doc:name="Flowvar_prp_password"/>
+        <set-variable variableName="prp_remoteDirectory" value="#[flowVars.destinationServiceConfigObj.get(&quot;remoteDirectory&quot;)]" doc:name="Flowvar_prp_remoteDirectory"/>
+        <set-variable variableName="prp_protocol" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.protocol&quot;)]" doc:name="Flowvar_prp_protocol"/>
+        <set-variable variableName="prp_ppk" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.ppk&quot;)]" doc:name="Flowvar_prp_ppk"/>
+        <set-variable variableName="allSourceFileNames" value="#[flowVars.filename]" doc:name="allSourceFileNames"/>
+
+        <set-variable variableName="sourceFileNameList" value="#[flowVars.allSourceFileNames.split(&quot;,&quot;)]" doc:name="sourceFileNameList"/>
+
+        <set-variable variableName="exception.queue.name" value="#[flowVars.destinationServiceConfigObj.get(&quot;connect.fileoutbound.exception.queue.name&quot;)]" doc:name="Flowvar_exception.queue.name"/> -->
+        
+        
+        <expression-component doc:name="captureMessageProperties" doc:description="captureMessageProperties "><![CDATA[flowVars[FTPGatewayConstants.PRPHOST]= destinationServiceConfigObj.get("connect.host");
+flowVars[FTPGatewayConstants.PRPPORT]= flowVars.destinationServiceConfigObj.get("connect.port");
+flowVars[FTPGatewayConstants.PRPUSER]= flowVars.destinationServiceConfigObj.get("connect.trg.user");
+flowVars[FTPGatewayConstants.PRPPASSWPRD]=flowVars.destinationServiceConfigObj.get("connect.trg.password");
+flowVars[FTPGatewayConstants.PRPREMOTEDIRECTORY] = flowVars.destinationServiceConfigObj.get("remoteDirectory");
+flowVars[FTPGatewayConstants.PRPPROTOCOL]=flowVars.destinationServiceConfigObj.get("connect.protocol");
+flowVars[FTPGatewayConstants.PRPPPK]=flowVars.destinationServiceConfigObj.get("connect.ppk");
+flowVars[FTPGatewayConstants.ALLSOURCEFILENAME]=flowVars.filename;
+flowVars[FTPGatewayConstants.EXCEPTIONQUEUENAME]=flowVars.destinationServiceConfigObj.get("connect.fileoutbound.exception.queue.name");
+flowVars[FTPGatewayConstants.SOURCEFILENAMELIST]=flowVars.allSourceFileNames.split(",");]]>
+																
+																</expression-component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="allSourceFileNames of file outbound #[flowVars.allSourceFileNames]" processState="102012130" doc:name="Connectlogger"/>
+    </sub-flow>
+    
+    	<sub-flow name="process-each-file" >
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="processing each file is started for file outbound" processState="102012140" doc:name="Connectlogger"/>
+        <set-variable variableName="fileProcessedPayload" value="#[new java.lang.Object()]" doc:name="initialise-file-processsed-status" doc:description="Basically this variable is used to store the payload after file has been processed in for each. Because, if any error/exception is raised in for each scope, EnterpriseException object which generates in for each scope will not be available outside of the foreach. So, this variable restores that payload."/>
+
+		<foreach collection="#[flowVars.sourceFileNameList]"
+			counterVariableName="sourceFileCounter" doc:name="for-each-file">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: #[payload]  ::  processing the file of fileoutbound has started." processState="102012150" doc:name="Connectlogger"/>
+            <set-variable variableName="processingFilenameAndLocation" value="#[payload]" doc:name="processingFilenameAndLocation"/>
+            <expression-component file="expressionComponentsFiles/getFileName.txt" doc:name="get-source-file" doc:description="expression to get-source-file"/>
+
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: flowVars.ftpRemoteFileName  ::   #[flowVars.ftpRemoteFileName]  flowVars.sourceFileName   ::  #[flowVars.sourceFileName]" processState="102012160" doc:name="Connectlogger"/>
+
+			<flow-ref name="read-source-file" doc:name="read-source-file" doc:description="refers to teh read-source-file flow"/>
+			<choice doc:name="is-payload-fileinputstream" doc:description="check is-payload-fileinputstream">
+				<when expression="#[payload is java.io.FileInputStream]">
+                    <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Source file available as specified in resourceId" processState="102012170" doc:name="Connectlogger"/>
+
+
+					<flow-ref name="check-authentication-type" doc:name="check-authentication-type" doc:description="refer tois-payload-fileinputstream flow"/>
+					<expression-component doc:name="close-source-file-input-stream-object"
+						doc:description="close soure file input stream object."><![CDATA[flowVars.sourceFileInputStreamObject.close();]]></expression-component>
+					<flow-ref name="move-source-file-to-archive-location"
+						doc:name="move-source-file-to-archive-location" doc:description="refer to close-source-file-input-stream-object flow"/>
+                    <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="processing file of file outbound is completed " processState="102012380" doc:name="Connectlogger"/>
+
+
+				</when>
+				<otherwise>
+                    <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: #[payload] :: s is not payload file input stream of file outbound" processState="500012390" doc:name="Connectlogger"/>
+
+				</otherwise>
+			</choice>
+			<set-variable variableName="fileProcessedPayload" value="#[payload]"
+				doc:name="store-file-processsed-payload" doc:description="used to store-file-processsed-payload"/>
+		</foreach>
+		<set-payload value="#[flowVars.fileProcessedPayload]"
+			doc:name="set-file-processed-payload" doc:description="Set the payload after file has been processed" />
+	</sub-flow>
+
+    <sub-flow name="check-authentication-type">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="host name: #[flowVars.prp_host] Port : #[flowVars.prp_port] username #[flowVars.prp_user] Target directory: #[flowVars.prp_remote_Directory] Protocol: #[flowVars.prp_protocol] #[flowVars.prp_ppk]  " processState="102012180       " doc:name="Connectlogger"/>
+        <set-payload value="#[flowVars.sourceFileInputStreamObject]" doc:name="Set Payload" doc:description="sets the sourceFileInputStreamObject as paylaod"/>
+
+        <choice doc:name="Choice_AuthenticationType" doc:description="check for the authentication type">
+            <when expression="#[flowVars.prp_protocol == &quot;sftp&quot;  &amp;&amp; flowVars.prp_user != null &amp;&amp; flowVars.prp_password != null &amp;&amp; flowVars.prp_ppk != null]">
+            
+            
+            <!--     <logger message="SFTP-Username-Password-PPK" level="INFO" doc:name="SFTP-Username-Password-PPK"/> -->
+            
+            
+                <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="SFTP-Username-Password-PPK" processState="102012190" doc:name="Connectlogger"/>
+                <flow-ref name="upload-sftp-server-username-password-ppk" doc:name="upload-sftp-server-username-password-ppk" doc:description="refers to upload-sftp-server-username-password-ppk flow"/>
+            </when>
+            <when expression="#[flowVars.prp_protocol == &quot;sftp&quot;  &amp;&amp; flowVars.prp_user != null &amp;&amp; flowVars.prp_ppk != null]">
+            
+            
+                <!-- <logger message="SFTP-Username-PPK" level="INFO" doc:name="SFTP-Username-PPK"/> -->
+                
+                
+                
+                <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="SFTP-Username-PPK" processState="102012220" doc:name="Connectlogger"/>
+                <flow-ref name="upload-sftp-server-username-ppk" doc:name="upload-sftp-server-username-ppk" doc:description="refers to upload-sftp-server-username-password-ppk flow"/>
+            </when>
+            <when expression="#[flowVars.prp_protocol == &quot;sftp&quot; &amp;&amp; flowVars.prp_user != null &amp;&amp; flowVars.prp_password != null]">
+            
+            
+                <!-- <logger message="SFTP-Username-Password" level="INFO" doc:name="SFTP-Username-Password"/> -->
+                
+                
+                <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="SFTP-Username-Password" processState="102012250" doc:name="Connectlogger"/>
+                <flow-ref name="upload-sftp-server-username-password" doc:name="upload-sftp-server-username-password" doc:description="refers to upload-sftp-server-username-password-ppk flow"/>
+            </when>
+            <when expression="#[flowVars.prp_protocol == &quot;ftp&quot; &amp;&amp; flowVars.prp_user != null &amp;&amp; flowVars.prp_password != null]">
+            
+            
+                <!-- <logger message="FTP-Username-Password" level="INFO" doc:name="FTP-Username-Password"/> -->
+                
+                
+                <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="FTP-Username-Password" processState="102012290" doc:name="Connectlogger"/>
+                <flow-ref name="upload-ftp-server-username-password" doc:name="upload-ftp-server-username-password" doc:description="refers to upload-sftp-server-username-password-ppk flow"/>
+            </when>
+            <otherwise>
+            
+                <!-- <logger message="No-Auth-Found" level="INFO" doc:name="No-Auth-Found"/> -->
+                
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="No-Auth-Found" processState="102012310" doc:name="Connectlogger"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+    <flow name="upload-sftp-server-username-password-ppk">
+    
+        <!-- <logger message="upload-sftp-server-username-password-ppk" level="INFO" doc:name="Logger"/> -->
+        
+        
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="upload-sftp-server-username-password-ppk" processState="102012200" doc:name="Connectlogger"/>
+        <sftp:outbound-endpoint exchange-pattern="request-response" connector-ref="SFTP" outputPattern="#[flowVars.ftpRemoteFileName]" host="#[flowVars.prp_host]" port="#[flowVars.prp_port]" path="#[flowVars.prp_remote_Directory]" user="#[flowVars.prp_user]" password="#[flowVars.prp_password]" responseTimeout="10000" doc:name="SFTP_User_Pswd_PPK" doc:description="SFTP (User_Pswd_PPK)  retrives files and processes them and uploades them to the remote server"/>
+        <set-variable variableName="Scounter" value="Y" doc:name="successful-counter" doc:description="sets the successful-counter"/>
+        
+        
+        <!-- <logger message="File sent to target ==============" level="INFO" doc:name="Logger_Filesent"/> -->
+        
+        
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="File sent to target " processState="102012210" doc:name="Connectlogger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <flow-ref name="subRetriableFlow" doc:name="subRetriableFlow"/>
+        </catch-exception-strategy>
+    </flow>
+
+    <flow name="upload-sftp-server-username-ppk" processingStrategy="synchronous">
+    
+    
+       <!--  <logger message="upload-sftp-server-username-ppk" level="INFO" doc:name="Logger"/> -->
+       
+       
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="upload-sftp-server-username-ppk" processState="102012230" doc:name="Connectlogger"/>
+        <sftp:outbound-endpoint exchange-pattern="request-response" connector-ref="SFTP" outputPattern="#[flowVars.ftpRemoteFileName]" host="#[flowVars.prp_host]" port="#[flowVars.prp_port]" path="#[flowVars.prp_remote_Directory]" user="#[flowVars.prp_user]" responseTimeout="10000" doc:name="SFTP_User_PPK" doc:description="SFTP (User_PPK)  retrives files and processes them and uploades them to the remote server"/>
+
+        <set-variable variableName="Scounter" value="Y" doc:name="successful-counter" doc:description="sets the successful-counter"/>
+        
+        
+       <!--  <logger message="File sent to target ==============" level="INFO" doc:name="Logger_Filesent"/> -->
+       
+       
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="File sent to target" processState="102012240" doc:name="Connectlogger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <flow-ref name="subRetriableFlow" doc:name="subRetriableFlow"/>
+        </catch-exception-strategy>
+
+    </flow>
+
+    <flow name="upload-sftp-server-username-password" processingStrategy="synchronous">
+    
+    
+        <!-- <logger message="upload-sftp-server-username-password   ====   host name: #[flowVars.prp_host] Port : #[flowVars.prp_port] username #[flowVars.prp_user] Target directory: #[flowVars.prp_remote_Directory] Protocol: #[flowVars.prp_protocol] #[flowVars.prp_ppk]  " level="INFO" doc:name="Logger"/>
+        <logger message="before SFTP #[message]" level="INFO" doc:name="Logger"/>
+         -->
+         
+         
+         <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="upload-sftp-server-username-password   ====   host name: #[flowVars.prp_host] Port : #[flowVars.prp_port] username #[flowVars.prp_user] Target directory: #[flowVars.prp_remote_directory] Protocol: #[flowVars.prp_protocol] #[flowVars.prp_ppk]  " processState="102012260" doc:name="Connectlogger"/>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="before SFTP #[message]" processState="102012270" doc:name="Connectlogger"/>
+        <sftp:outbound-endpoint exchange-pattern="request-response" connector-ref="SFTP" outputPattern="#[flowVars.ftpRemoteFileName]" host="#[flowVars.prp_host]" port="#[flowVars.prp_port]" path="#[flowVars.prp_remote_directory]" user="#[flowVars.prp_user]" password="#[flowVars.prp_password]" responseTimeout="10000" doc:name="SFTP" doc:description="SFTP retrives files and processes them and uploades them to the remote server"/>
+
+
+        <set-variable variableName="Scounter" value="Y" doc:name="successful-counter" doc:description="sets the successful-counter"/>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="File sent to target" processState="102012280" doc:name="Connectlogger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <flow-ref name="subRetriableFlow" doc:name="subRetriableFlow"/>
+
+        </catch-exception-strategy>
+        
+        
+       <!--  <logger message="File sent to target ==============" level="INFO" doc:name="Logger_Filesent"/> -->
+
+    </flow>
+    <flow name="upload-ftp-server-username-password" processingStrategy="synchronous">
+
+        <ftp:outbound-endpoint host="#[flowVars.prp_host]" port="#[flowVars.prp_port]" path="#[flowVars.prp_remote_directory]" user="#[flowVars.prp_user]" password="#[flowVars.prp_password]" connector-ref="FTP" outputPattern="#[flowVars.ftpRemoteFileName]" responseTimeout="10000" doc:name="FTP" doc:description="FTP endpoint to retrieve the file and process them .">
+        
+        </ftp:outbound-endpoint>
+        <set-variable variableName="Scounter" value="Y" doc:name="successful-counter" doc:description="sets the successful-counter"/>
+        <set-variable variableName="processedFileNames" value="#[flowVars.processedFileNames == null ? flowVars.processingFilenameAndLocation:&quot;,&quot;+flowVars.processingFilenameAndLocation]" doc:name="Processed File Names"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="true" processState="102012888" doc:name="Connectlogger"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="File sent to target" processState="102012300" doc:name="Connectlogger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <flow-ref name="subRetriableFlow" doc:name="subRetriableFlow"/>
+
+       	</catch-exception-strategy>
+        
+        
+        
+        <!-- <logger message="File sent to target ==============" level="INFO" doc:name="Logger_Filesent"/> -->
+
+    </flow>
+    <flow name="move-source-file-to-archive-location" processingStrategy="synchronous">
+    
+    
+        <!-- <logger message="Archiving the file" level="INFO" doc:name="Logger_Archive"/> -->
+        
+        
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Archiving the file of file outbound" processState="102012320" doc:name="Connectlogger"/>
+        <set-variable variableName="absoluteArchiveFilename" value="#[flowVars.destinationServiceConfigObj.get(&quot;archiveDirectory&quot;)+FTPGatewayConstants.fileSeperator+flowVars.ftpRemoteFileName]" doc:name="absoluteArchiveFilename" doc:description="sets the absoluteArchiveFilename"/>
+
+
+        <!-- <logger message=" In File Archival  &gt;   #[message] " level="INFO" doc:name="Logger"/> -->
+        
+        
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="::  In File Archival of file outbound ::   #[message] " processState="102012330" doc:name="Connectlogger"/>
+        <choice doc:name="is-file-sent-to-destination" doc:description="choice if the file is sent to the destinatin">
+            <when expression="#[flowVars.Scounter == &quot;Y&quot;]">
+                <expression-component doc:name="move-source-file-archive" doc:description="move-source-file-archive"><![CDATA[import java.io.File;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import org.apache.commons.io.FileUtils;
+
+      File sourceFile = new File(sessionVars.resourceId);
+      DateFormat utcDateFormat =  new SimpleDateFormat(flowVars.destinationServiceConfigObj.get("archive.filename.timestamp.pattern"));
+      Date date = new Date();
+    System.out.println("sourceFile==========="+sourceFile);
+      flowVars.archivedFileName=flowVars.absoluteArchiveFilename+utcDateFormat.format(date);
+    System.out.println("flowVars.archivedFileName==========="+flowVars.archivedFileName);
+    
+	  FileUtils.copyFile(sourceFile, new File(flowVars.archivedFileName));
+
+      flowVars.archiveFileStatus = Boolean.TRUE;
+    System.out.println("flowVars.archiveFileStatus==========="+flowVars.archiveFileStatus);]]></expression-component>
+                <choice doc:name="is-archived" doc:description="check for the souce file archiving">
+                    <when expression="#[flowVars.archiveFileStatus == 'true']">
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="File has been archived for  the file outbound" processState="102012340" doc:name="Connectlogger"/>
+                    </when>
+                    <otherwise>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Archive has been failed for the file outbound" processState="102012350" doc:name="Connectlogger"/>
+                        <scripting:component doc:name="throw-exception-archiving-is-failed" doc:description="groovy script to throw Exception">
+                            <scripting:script engine="Groovy"><![CDATA[throw new Exception("Archiving source file is failed.");]]></scripting:script>
+                        </scripting:component>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <expression-component doc:name="move-source-file-error" doc:description="move-source-file-error"><![CDATA[import java.io.File;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+      File sourceFile = new File(flowVars.processingFilenameAndLocation);
+      flowVars.errorFileName = sourceFile+".error";
+      flowVars.errorFileStatus = sourceFile.renameTo(new File(flowVars.errorFileName));]]></expression-component>
+                <choice doc:name="is-filename-changed-to-'.error'" doc:description="check for the file name chnaged to error">
+                    <when expression="#[flowVars.errorFileStatus == Boolean.valueOf(&quot;true&quot;)]">
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="source filename changed to error and source file was not archived as source file is not ftped to destination" processState="102012360" doc:name="Connectlogger"/>
+                      <!--   <scripting:component doc:name="throw-exception-source-file-is-not-sent" doc:description="groovy script to throw Exception">
+                            <scripting:script engine="Groovy"><![CDATA[//throw new Exception("Source file was not archived as source file is not ftped to destination");]]></scripting:script>
+                        </scripting:component> -->
+                    </when>
+                    <otherwise>
+                        <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="Changing source file to '.error' file is failed" processState="500012370" doc:name="Connectlogger"/>
+                        <scripting:component doc:name="throw-exception-'.error'-is-failed" doc:description="groovy script to throw Exception">
+                            <scripting:script engine="Groovy"><![CDATA[throw new Exception("Changing source filename to '.error' file is failed. ");]]></scripting:script>
+                        </scripting:component>
+                    </otherwise>
+                </choice>
+            </otherwise>
+        </choice>
+
+
+        <exception-strategy ref="globalChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+
+      </flow>
+    <sub-flow name="connect-send_email_subflow">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Inside Email Send Flow === Whether Send Email is Configured === #[flowVars[ConnectConstants.VAR_FTP_EMAIL_SEND]]" processState="102012500" doc:name="Connectlogger - Check Email Configured"/>
+        <choice doc:name="Choice - Check Sending Email is Configured">
+            <when expression="#[flowVars.sendEmail == &quot;true&quot;]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="===== Email Send Is Configured ==== Sending Email Flow Started  #[flowVars.notificationMessagePayload]" processState="102012501" doc:name="Connectlogger - Sending Email"/>
+                <message-filter doc:name="Message - Processed File Names Check">
+                    <expression-filter expression="#[flowVars.processedFileNames != null]"/>
+                </message-filter>
+
+                <component class="com.redn.connect.ftp.util.NotificationMessageProcessor" doc:name="Java - Notification Message Processor"/>
+
+                <jms:outbound-endpoint queue="${connect.email.queue}" connector-ref="Active_MQ" doc:name="JMS"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="====== Email Flow Completed Successfully =======" processState="10212502" doc:name="Connectlogger"/>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="=== No Need Of Sending Emails ====" processState="102012503" doc:name="Connectlogger - No need of sending Emails"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+      
+      
+      
+      <flow name="read-source-file" 
+		processingStrategy="synchronous">
+		<component class="com.redn.connect.ftp.util.ReadSourceFile"
+			doc:name="read-source-file"
+			doc:description="This component reads a file and return buffer reader instance." />
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="File has been read for the file outbound" processState="102012504" doc:name="Connectlogger"/>
+
+		<exception-strategy ref="globalChoiceExceptionStrategy"
+			doc:name="Reference Exception Strategy" />
+	</flow> 
+    <sub-flow name="subRetriableFlow">
+        <expression-component doc:name="set Exception Properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=FTPGatewayConstants.ERROR_FTP_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]="Error in communicating with FTP: " +  exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_FTP;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;
+]]></expression-component>
+        <flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow"/>
+    </sub-flow>
+	
+</mule>

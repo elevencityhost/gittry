@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="connect-sms-logger" doc:name="Connectlogger: Configuration" />
+	<http:request-builder name="Request_Builder"
+		doc:name="Request Builder">
+	</http:request-builder>
+	<http:listener-config name="HTTP_Listener_Configuration"
+		host="0.0.0.0" port="${connect.smsservice.inbound.http.port}" doc:name="HTTP Listener Configuration" />
+	<flow name="connect-sms-serviceFlow">
+			<http:listener config-ref="HTTP_Listener_Configuration"
+				path="/smsserviceflow" allowedMethods="POST" doc:name="HTTP - SMS Service Flow" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Received payload from connect notifier"
+			processState="102020100" doc:name="Connectlogger-Received SMS Message" />
+
+		<choice doc:name="Check Payload Type">
+			<when
+				expression="#[null != payload &amp;&amp; payload instanceof org.glassfish.grizzly.utils.BufferInputStream]">
+                <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+
+				<set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]"
+					doc:name="Set CEM Object As Payload" />
+			</when>
+			<otherwise>
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					logMessage="Received payload is not an instance of string"
+					processState="102020110" doc:name="Connectlogger-Invalid Payload" />
+			</otherwise>
+		</choice>
+
+
+		<message-filter throwOnUnaccepted="true"
+			doc:name="Validate Enterprise Message">
+			<expression-filter
+				expression="#[payload !=null &amp;&amp; payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]" />
+		</message-filter>
+		<expression-component doc:name="Expression-Set Properties"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-sms-service");
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;]]></expression-component>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="SMS payload validated successfully" processState="102020120"
+			doc:name="Connectlogger-started SMS process" />
+		<enricher doc:name="Message Enricher" target="logCem">
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				doc:name="Connectlogger-LogCEM" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]"
+				processState="102020960" />
+		</enricher>
+		<set-payload
+			value="#[new com.redn.connect.util.ConnectUtils().getPayloadTextContentFromCEM(payload)]"
+			doc:name="Extract payload from CEM" />
+		<json:json-to-object-transformer
+			doc:name="JSON to Object" returnClass="com.redn.connect.notifications.request.SMSMessage" />
+		<flow-ref name="SendSMS-Flow" doc:name="SendSMS-Flow" />
+		<exception-strategy ref="smsserviceExceptionStrategy"
+			doc:name="Reference Exception Strategy" />
+
+	</flow>
+	<sub-flow name="SendSMS-Flow">
+		<component doc:name="Prepare Send SMS Data">
+			<spring-object bean="springSendSmsBeanName" />
+		</component>
+		<http:request config-ref="HTTP_Request_Configuration"
+			path="#[flowVars.path]" method="POST" doc:name="HTTP- call route mobile API">
+			<http:request-builder>
+				<http:query-param paramName="username"
+					value="${connect.smsservice.http.username}" />
+				<http:query-param paramName="password"
+					value="${connect.smsservice.http.password}" />
+				<http:query-param paramName="type" value="#[flowVars.type]" />
+				<http:query-param paramName="dlr" value="#[flowVars.dlr]" />
+				<http:query-param paramName="message"
+					value="#[flowVars.messageContent]" />
+				<http:query-param paramName="destination"
+					value="#[flowVars.destination]" />
+				<http:query-param paramName="source" value="#[flowVars.source]" />
+			</http:request-builder>
+			<http:success-status-code-validator
+				values="200" />
+		</http:request>
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+		<component class="com.redn.connect.smsservice.processor.PrepareSMSResponse"
+			doc:name="Prepare SMS Response" />
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="SMS sent successfully  #[message].#[payload]" processState="102020130"
+			doc:name="Connectlogger-SMS sent successfully" />
+        <async doc:name="Async">
+            <flow-ref name="StoreSMSStatus" doc:name="StoreSMSStatus"/>
+        </async>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Async flow Completed" processState="102020140" doc:name="Connectlogger-Database flow Completed"/>
+
+
+	</sub-flow>
+	<sub-flow name="StoreSMSStatus">
+                <expression-component doc:name="Expression-PrepareDLRStatusList"><![CDATA[payload = flowVars.dlrList;]]></expression-component>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Insertion Database flow started" processState="102020150" doc:name="Connectlogger-Database Flow Started"/>
+                <foreach doc:name="For Each">
+                    <db:insert config-ref="MySQL_Configuration" doc:name="Database-insert sms data">
+                        <db:parameterized-query><![CDATA[${connect.smsservice.database.insertQuery}]]></db:parameterized-query>
+                    </db:insert>
+                </foreach>
+                <choice doc:name="Check row is inserted">
+                    <when expression="#[payload.size() &gt; '0']">
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Records successfully inserted into database" processState="102020160" doc:name="Connectlogger-Inserted in database"/>
+                    </when>
+                    <otherwise>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Records not inserted into database" processState="102020170" doc:name="Connectlogger-Not Inserted in database"/>
+                    </otherwise>
+                </choice>
+	</sub-flow>
+</mule>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.8.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<configuration doc:name="reusable classes">
+		<expression-language autoResolveVariables="true">
+			<import
+				class="com.redn.connect.ftps.outbound.constants.FTPSOutboundConstants" />
+			<import class="com.redn.connect.util.ConnectUtils" />
+			<import class="com.redn.connect.constants.ConnectConstants" />
+			<import class="com.redn.connect.exception.Category" />
+		</expression-language>
+	</configuration>
+
+	<spring:beans>
+
+		<spring:bean
+			class="com.redn.connect.ftps.outbound.processors.ReadCEMAndPrepareFTPSProperties"
+			id="readCEMAndPrepareFTPSPropertiesID" name="readCEMAndPrepareFTPSPropertiesName">
+		</spring:bean>
+		<spring:bean
+			class="com.redn.connect.ftps.outbound.processors.PrepareFileAsStreamObject"
+			id="prepareFileStreamObjectID" name="prepareFileStreamObjectName">
+		</spring:bean>
+
+
+		<spring:bean id="connectConfigBean" name="connectConfigBean"
+			class="com.redn.connect.processor.connectconfig.ConnectConfiguration">
+			<spring:property name="location"
+				value="connect_config_ftps_outbound.properties" />
+		</spring:bean>
+
+	</spring:beans>
+
+</mule>

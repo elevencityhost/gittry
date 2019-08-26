@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+
+ 	<flow name="before-send-receipt-flow" doc:description="This flow is triggered to before sending the MDN to partner. Source system is deriver, input file is archived, CEM is built and API Manager is called">
+        <set-variable variableName="#[ConnectConstants.VAR_MESSAGE_ID]" value="#[message.rootId]" doc:name="set message id" doc:description="sets the message id"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="connect-as2 inbound received message" processState="102009100" doc:name="Log - Message Received"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <component doc:name="derive the source system" doc:description="derives the source system flow using as2-from">
+            <spring-object bean="springDeriveSourceSystemProcessorBean"/>
+        </component>
+        <flow-ref name="subBackUpFileFlow" doc:name="subBackUpFileFlow" doc:description="calls the backup file flow"/>
+        <component doc:name="create CEM" doc:description="creates Connect Enterprise Message">
+            <spring-object bean="springCreateConnectEnterpriseMessageProcessorBean"/>
+        </component>
+        <flow-ref name="subCaptureEnterpriseDetailsReceiveFlow" doc:name="subCaptureEnterpriseDetailsReceiveFlow" doc:description="calls captureEnterpriseDetailsFlow"/>
+        <enricher doc:name="Message Enricher" target="#[flowVars.logCEM]">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102009960" doc:name="Connectlogger - Log CEM"/>
+
+        </enricher>
+
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received AS2 Message to Connect AS2 from Source System: #[flowVars[AS2Constants.VAR_SOURCE_SYSTEM]]" processState="102009101" doc:name="Log - Message Received"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Sending CEM to Connect API Manager" processState="102009110" doc:name="Log - Before Calling API Manager"/>
+
+        <flow-ref name="call-connect-api-manager-flow" doc:name="call-connect-api-manager-flow" doc:description="calls connect api manager flow"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars[AS2Constants.VAR_IS_APIMGR_CALL_SUCCESS] == true]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Input Request is forwarded to API Manager" processState="102009120" doc:name="Log - After Calling API Manager"/>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Error in forwarding Input Request to API Manager" processState="500009121" doc:name="Log - Error Calling API Manager"/>
+                <scripting:component doc:name="Throw an Exception" doc:description="Throws exception in case of api manager call is not successful">
+                    <scripting:script engine="Groovy"><![CDATA[throw new Exception("Error in processing AS2 message");]]></scripting:script>
+                </scripting:component>
+            </otherwise>
+        </choice>
+    </flow>
+    
+    <sub-flow name="subCaptureEnterpriseDetailsReceiveFlow"  doc:description="this flow captures enterprise message details">
+        <set-variable variableName="#[ConnectConstants.VAR_ENTERPRISE_MESSAGE]" value="#[payload]" doc:name="store enterpriseMessage" doc:description="store enterpriseMessage for later use"/>
+        <expression-component doc:name="captureMessageProperties" doc:description="captures message properties "><![CDATA[flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[AS2Constants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+
+payload.getEnterpriseHeader().setComponent("connect-as2-receive");
+
+
+
+
+]]></expression-component>
+
+    </sub-flow>
+
+
+    
+    <sub-flow name="subBackUpFileFlow" doc:description="sets the back up file properties and calls write to file flow">
+        <expression-component doc:name="Set Backup file properties"><![CDATA[flowVars[AS2Constants.VAR_BACKUP_FOLDER]='${connect.as2.backup.folder.inbound}';
+flowVars[AS2Constants.VAR_DIRECTION]=AS2Constants.CONST_DIRECTION_INBOUND;
+flowVars[AS2Constants.VAR_BACKUP_FILE_PREFIX]='${connect.as2.backup.file.prefix.inbound}';]]></expression-component>
+        <flow-ref name="subWriteToFile" doc:name="subWriteToFile" doc:description="calls writeToFile flow"/>
+    </sub-flow>
+</mule>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ConnectEnterpriseMessage
+	xmlns="http://schemas.connect.com/enterprise/services/2014/05">
+	<EnterpriseHeader>
+		<MessageId>8ase-sd-vf-123</MessageId>
+		<CreatedUtc>2016-11-21T13:20:00.000-05:00</CreatedUtc>
+		<SourceSystem>lenovo</SourceSystem>
+		<TargetSystem>Target_0</TargetSystem>
+	    <PartnerId>Partner_Id</PartnerId>
+		<ServiceName>lenovo</ServiceName>
+		<MessageSource>Message_Source</MessageSource>
+		<Action>Action_0</Action>
+		<Communication>Async</Communication>
+		<Priority>Priority_0</Priority>
+	</EnterpriseHeader>
+	<EnterpriseBody>
+		<Payload>
+			<field1>field1</field1>
+			<field2>field2</field2>
+			<field3>field3</field3>
+		</Payload>
+	</EnterpriseBody>
+</ConnectEnterpriseMessage>

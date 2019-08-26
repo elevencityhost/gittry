@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+
+	<configuration doc:name="Configuration">
+		<expression-language autoResolveVariables="true">
+			<import class="com.redn.connect.sapgw.constants.Connect2sapCommonConstants" />
+			<import class="com.redn.connect.constants.ConnectConstants" />
+			<import class="com.redn.connect.exception.Category" />
+			<import class="com.redn.connect.util.ConnectUtils" />
+		</expression-language>
+	</configuration>
+	<spring:beans>
+		<spring:bean id="connect2sapCommonConfiguration" name="connect2sapCommonConfiguration"
+			class="com.redn.connect.processor.connectconfig.ConnectConfiguration">
+			<spring:property name="location"
+				value="connect_config_connect2sap.properties" />
+		</spring:bean>
+
+		<spring:bean id="SpringRemovePrologBean" name="SpringRemovePrologBean"
+			class="com.redn.connect.processor.RemoveProlog" />
+
+
+		<spring:bean id="springExtractCEMPropertiesBeanId" name="springExtractCEMPropertiesBeanId"
+			class="com.redn.connect.modifiers.ExtractCEMProperties">
+		</spring:bean>
+
+
+	</spring:beans>
+
+	<jms:activemq-connector name="Connect2sapCommonActiveMqConn"
+		username="${connect.connect2sap.common.activemq.user}" password="${connect.connect2sap.common.activemq.password}"
+		brokerURL="${connect.connect2sap.common.activemq.url}"
+		validateConnections="true" doc:name="Active MQ" persistentDelivery="true" specification="1.1" numberOfConsumers="${connect.connect2sap.common.activemq.consumers}">
+		<reconnect-forever frequency="${connect.connect2sap.common.activemq.frequency}" />
+		<service-overrides sessionHandler="org.mule.session.NullSessionHandler"/>
+	</jms:activemq-connector>
+</mule>

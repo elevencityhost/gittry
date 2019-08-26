@@ -1,0 +1,17 @@
+http://localhost:9090/cnaudit/audit
+
+{
+    "auditPostRequest": 
+                                {
+                                                "interface_id": "LEN001",
+                                                "job_id": "TestCaseEntrytest",
+                                                "prop_name": "DEF_CRDT_AMOUNT",
+                                                "prop_value": "300",
+                                                "status_id": "0",
+                                                "phase_id": "240",
+                                                "system_id": "2000",
+                                                "batch_counter":"3",
+                                                "external_id":"11",
+                                                "comment": "This is a Test Insert"
+                                }
+}

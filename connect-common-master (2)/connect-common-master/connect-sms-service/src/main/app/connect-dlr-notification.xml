@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="connect-dlr-notificationFlow">
+        <jms:inbound-endpoint queue="${connect.smsservice.dlr.queuename}" connector-ref="Active_MQ" doc:name="sms-delivery-status queue"/>
+      	<connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received payload from connect notifier" processState="102020160" doc:name="Connectlogger-Log dlr notification Message"/>
+        <message-filter throwOnUnaccepted="true" doc:name="Validate Enterprise Message">
+            <expression-filter expression="#[payload !=null &amp;&amp; payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]"/>
+        </message-filter>
+        <expression-component doc:name="Expression-Set Properties"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-sms-service");
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;]]></expression-component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="dlr notification payload validated successfully" processState="102020170" doc:name="Connectlogger-started dlr notification process"/>
+        <enricher doc:name="Message Enricher" target="logCem">
+            <connectlogger:info config-ref="Connectlogger__Configuration" doc:name="Connectlogger-LogCEM" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102020960"/>
+        </enricher>
+        <set-payload value="#[new com.redn.connect.util.ConnectUtils().getPayloadTextContentFromCEM(payload)]" doc:name="Extract payload from CEM"/>
+        <json:json-to-object-transformer returnClass="com.redn.connect.smsservice.pojo.DeliveryStatus" doc:name="JSON to Object"/>
+        <flow-ref name="updatedlrStatus_Database_Sub_Flow" doc:name="updatedlrStatus_Database_Sub_Flow"/>
+         
+        <exception-strategy ref="smsserviceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="updatedlrStatus_Database_Sub_Flow">
+    <db:update config-ref="MySQL_Configuration" doc:name="Database-Update DLR Status">
+            <db:parameterized-query><![CDATA[${connect.smsservice.database.dlr.updateQuery}]]></db:parameterized-query>
+        </db:update>
+        <choice doc:name="Check row is updated">
+            <when expression="#[payload == '0']">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Dlr status not updated in database " processState="102020180" doc:name="Connectlogger-Records not found "/>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Dlr status  updated in database " processState="102020190" doc:name="Connectlogger-Updated in database"/>
+            </otherwise>
+        </choice>
+      </sub-flow>
+   
+</mule>

@@ -1,0 +1,36 @@
+{
+	"type":"object",
+	"$schema": "http://json-schema.org/draft-03/schema",
+	"id": "http://jsonschema.net",
+	"required":false,
+	"properties":{
+		"validationPutRequest": {
+			"type":"object",
+			"id": "http://jsonschema.net/validationPutRequest",
+			"required":true,
+			"properties":{
+				"interface_id": {
+					"type":"string",
+					"required":true
+				},
+				"job_id": {
+					"type":"string",
+					"required":true
+				},
+				"prop_name": {
+					"type":"array",
+					"required":true,
+					"items":
+						{
+							"type":"string",
+							"required":true
+						}
+				},
+				"system_id": {
+					"type":"string",
+					"required":true
+				}
+			}
+		}
+	}
+}

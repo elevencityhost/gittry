@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:https="http://www.mulesoft.org/schema/mule/https" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+ 
+    <https:endpoint exchange-pattern="request-response" host="${connect.as2.wdc.send.https.host}" port="${connect.as2.wdc.send.https.port}" path="${connect.as2.wdc.send.https.path}" connector-ref="HTTPS_wdc_Send" method="POST" name="HTTPS_AS2_Send_wdc_EndPoint" responseTimeout="${connect.as2.wdc.send.https.response.timeout}" doc:name="HTTPS" doc:description="HTTPS endpoint for wdc">
+        <reconnect frequency="${connect.as2.wdc.send.https.reconnection.frequency}" count="${connect.as2.wdc.send.https.reconnection.attempts}"/>
+    </https:endpoint>
+    <https:connector name="HTTPS_wdc_Send" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="${connect.as2.wdc.send.https.connection.clientSoTimeout}" serverSoTimeout="${connect.as2.wdc.send.https.connection.serverSoTimeout}" socketSoLinger="0" connectionTimeout="${connect.as2.wdc.send.https.connection.timeout}" doc:name="HTTP-HTTPS" doc:description="HTTPS Connector for wdc">
+    	<https:tls-server path="${connect.as2.wdc.httpsKeyStorePath}" storePassword="${connect.as2.wdc.httpsKeyStorePassword}"/>
+    </https:connector>
+    <as2:config name="AS2_Send_wdc_HTTPS_Configuration" httpEndpointRef="HTTPS_AS2_Send_wdc_EndPoint" doc:name="AS2: HTTPS Configuration" doc:description="AS2 HTTPS configuration for wdc"/>
+
+    <flow name="wdc-send-flow" doc:description="This flow is used to send outbound AS2 messages to wdc using AS2 connector and validates the response from wdc">
+    	<as2:send config-ref="AS2_Send_wdc_HTTPS_Configuration" as2From="${connect.as2.wdc.send.from}" as2To="${connect.as2.wdc.send.to}" keyStorePath="${connect.as2.wdc.as2KeyStorePath}" keyStorePassword="${connect.as2.wdc.as2KeyStorePassword}" requestReceipt="signed" sign="true" encrypt="true" doc:name="AS2 - wdc - Send" contentType="${connect.as2.wdc.send.contentType}" receiptTimeout="${connect.as2.wdc.send.receiptTimeout}" subject="${connect.as2.wdc.send.subject}" messageId="#[flowVars[ConnectConstants.VAR_MESSAGE_ID]]"/>
+        <flow-ref name="subValidateResponseFromTargetSystem" doc:name="subValidateResponseFromTargetSystem" doc:description="calls the flow to validate the response from wdc"/>
+        <catch-exception-strategy doc:name="wdc-send-Catch_Exception_Strategy" doc:description="handles the exceptions in sending AS2 messages to wdc">
+
+            <expression-component doc:name="set exception properties" doc:description="sets exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=AS2Constants.ERROR_CODE_wdc_AS2_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]="Error in communicating with wdc AS2: " +  exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=AS2Constants.CONST_EXCEPTION_ORIGIN_wdc_AS2_HTTPS;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;]]>
+            </expression-component>
+            <flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" doc:description="calls the flow to prepare EE and send to CEH"/>
+
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

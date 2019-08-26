@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:ftps="http://www.mulesoft.org/schema/mule/ftps" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/ftps http://www.mulesoft.org/schema/mule/ftps/current/mule-ftps.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="i1knbd002-inboundFlow">
+        <ftps:read config-ref="FTPS__Basic_Configuration" filePath="${connect.ftpsinb.read.path}" moveToDir="${connect.ftpsinb.processed.path}" doc:name="FTPS (Streaming)" pollingFrequency="${connect.ftpsinb.polling.frequency}"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="FTPS Inbound triggered for I1KNBD002" processState="102022100" doc:name="Connectlogger"/>
+        <set-session-variable variableName="#[FTPSInboundConstants.VENDOR_NAME]" value="#[FTPSInboundConstants.I1KNBD002]" doc:name="I1KNBD002"/>
+        <flow-ref name="connect-ftps-inbound" doc:name="connect-ftps-inbound"/>
+        <exception-strategy ref="ftpsInboundChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+</mule>
+ 

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:sap="http://www.mulesoft.org/schema/mule/sap"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<sap:connector name="SAPDistributionsConn" 
+		jcoAsHost="${connect.sapgw.sapinstance.distribution.host}" 
+		jcoUser="${connect.sapgw.sapinstance.distribution.user}" 
+		jcoPasswd="${connect.sapgw.sapinstance.distribution.password}" 
+		jcoSysnr="${connect.sapgw.sapinstance.distribution.systemnumber}" 
+		jcoClient="${connect.sapgw.sapinstance.systemnumber.distribution.client}" 
+		validateConnections="true" 
+	 	jcoPeakLimit="${connect.sapgw.distribution.jco.peaklimit}" 
+		jcoPoolCapacity="${connect.sapgw.distribution.jco.poolcapacity}" 
+		jcoExpirationTime="${connect.sapgw.distribution.jco.expirationtime}" doc:name="SAP"/>
+		
+	
+	<sap:connector name="SAPDistributionsConnGM2" 
+		jcoAsHost="${connect.sapgw.sapinstance.distribution.gm2.host}" 
+		jcoUser="${connect.sapgw.sapinstance.distribution.gm2.user}" 
+	    jcoPasswd="${connect.sapgw.sapinstance.distribution.gm2.password}" 
+	    jcoSysnr="${connect.sapgw.sapinstance.distribution.gm2.systemnumber}" 
+		jcoClient="${connect.sapgw.sapinstance.systemnumber.distribution.gm2.client}" 
+		validateConnections="true" 
+	 	jcoPeakLimit="${connect.sapgw.distribution.gm2.jco.peaklimit}" 
+		jcoPoolCapacity="${connect.sapgw.distribution.gm2.jco.poolcapacity}" 
+		jcoExpirationTime="${connect.sapgw.distribution.gm2.jco.expirationtime}" 
+	doc:name="SAP"/>		
+		
+		
+    <connectlogger:config name="ConnectloggerConn" loggerName="connect-sap2connect-distribution-logger" doc:name="Connectlogger: Configuration"/>     
+	<jms:activemq-connector name="Sap2connectActiveMQConn"
+		username="${connect.sapgw.distribution.activemq.user}" 
+		password="${connect.sapgw.distribution.activemq.password}"
+		brokerURL="${connect.sapgw.distribution.activemq.url}" validateConnections="true"
+		doc:name="Active MQ Global Connector" numberOfConsumers="${connect.sapgw.distribution.activemq.consumers}" persistentDelivery="true" specification="1.1">
+        <reconnect-forever frequency="${connect.sapgw.distribution.activemq.frequency}"/>
+        <service-overrides sessionHandler="org.mule.session.NullSessionHandler"/>
+    </jms:activemq-connector>
+</mule>

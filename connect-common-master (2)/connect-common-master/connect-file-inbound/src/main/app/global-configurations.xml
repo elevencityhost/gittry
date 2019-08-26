@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:edifact-edi="http://www.mulesoft.org/schema/mule/edifact-edi"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/edifact-edi http://www.mulesoft.org/schema/mule/edifact-edi/current/mule-edifact-edi.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <configuration doc:name="Configuration">
+		<expression-language autoResolveVariables="true">
+			<import class="com.redn.connect.connectfileinbound.constants.FPConstants"/>
+			<import class="com.redn.connect.constants.ConnectConstants" />
+			<import class="com.redn.connect.exception.Category" />
+			<import class="com.redn.connect.util.ConnectUtils" />
+		</expression-language>
+	</configuration>
+		
+	<spring:beans>
+	  	<spring:bean id="objectStore" class="org.mule.util.store.SimpleMemoryObjectStore" />
+		<spring:bean id="connectConfigBean" name="connectConfigBean" class="com.redn.connect.processor.connectconfig.ConnectConfiguration">
+            <spring:property name="location" value="connect_config_fileinbound.properties"/>
+
+        </spring:bean>
+        
+        
+        <spring:bean id="springExtractPayloadProcessorBeanId" name="springExtractPayloadProcessorBean"
+			class="com.redn.connect.processor.ExtractPayloadProcessor">
+		</spring:bean> 
+         <spring:bean id="renameFileExtensionBean" name="renameFileExtensionBean" class="com.redn.connect.component.RenameFileExtension"/>
+        
+     </spring:beans>
+   
+</mule>

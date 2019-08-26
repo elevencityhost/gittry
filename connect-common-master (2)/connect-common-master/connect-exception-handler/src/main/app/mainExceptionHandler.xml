@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp" xmlns:imap="http://www.mulesoft.org/schema/mule/imap" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/imap http://www.mulesoft.org/schema/mule/imap/current/mule-imap.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+    <mulexml:jaxb-context name="JAXB_Context" packageNames="com.redn.connect.vo" doc:name="JAXB Context"/>
+
+   
+     
+    <flow name="connectehFlow">
+        <jms:inbound-endpoint queue="${connect.exception.handler.queueName}" connector-ref="EH_ActiveMQGlblConn" doc:name="JMS-exception-handler-queue">
+        </jms:inbound-endpoint>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: :: Message received in CEH ::" processState="102008100" doc:name="Connectlogger"/>
+        <message-filter throwOnUnaccepted="true" doc:name="ValidateCEE">
+            <expression-filter expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseException]"/>
+        </message-filter>
+       <!--   <enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEEObjectToXML(payload)] " processState="102008960" doc:name="Connectlogger"/>
+        </enricher>  -->
+        <set-variable variableName="#[CEHConstants.VAR_EXCEPTION_MSG]" value="#[payload]" doc:name="EnterpriseExceptionMessage"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Exception raised in component #[payload.getComponent()] #[payload.getServiceName() != null ? 'while processing '+payload.getServiceName() +' request': '' ]  ::" processState="102008101" doc:name="Connectlogger"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="The Error Details: #[payload.getErrorCode()] +The Error Description: #[payload.getDescription()]" processState="102008102" doc:name="Connectlogger"/>
+        <flow-ref name="processRequestBasedOnRetryableProp" doc:name="processRequestBasedOnRetryableProp"/>
+
+
+        <flow-ref name="reciever_message_send_email" doc:name="reciever_message_send_email"/>
+        <choice-exception-strategy doc:name="connect-exception-handlerChoice_Exception_Strategy">
+             <catch-exception-strategy
+				when="#[exception.causedBy(org.mule.api.routing.filter.FilterUnacceptedException)]"
+				doc:name="filterUnAcceptedExceptionStrategy">
+                <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="The received message is not an Exception Message " processState="400008100" doc:name="Connectlogger"/>
+				
+			</catch-exception-strategy> 
+            <catch-exception-strategy when="#[exception.causedBy(com.sun.mail.smtp.SMTPSendFailedException)]" doc:name="SMTPSendFailedExceptionStrategy">
+                <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="Error while sending email notification from ConnectExceptionMessage" processState="500008110" doc:name="Connectlogger"/>
+
+            </catch-exception-strategy>
+            <catch-exception-strategy doc:name="OtherExceptionStrategy">
+                <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="Exception while processing CEM in CEH : #[exception != null ?exception.getMessage() : '']" processState="500008120" doc:name="Connectlogger"/>
+
+            </catch-exception-strategy>
+        </choice-exception-strategy>
+
+    </flow>
+
+     <sub-flow name="processRequestBasedOnRetryableProp">
+
+
+        <enricher doc:name="Message Enricher" target="#[flowVars[CEHConstants.VAR_ORIGINAL_NATIVE_MSG]]">
+            <flow-ref name="Transform_original_message" doc:name="Transform_original_message"/>
+        </enricher>
+        <enricher doc:name="Message Enricher" target="#[flowVars[CEHConstants.VAR_EXCEPTION_MSG_NATIVE]]">
+            <flow-ref name="Transform_exception_message" doc:name="Transform_exception_message"/>
+        </enricher>
+        <flow-ref name="setproperties" doc:name="setproperties"/>
+        <choice doc:name="Retryable choice">
+            <when expression="#[payload.isRetryable() == true]">
+               
+                <enricher doc:name="Message Enricher" target="flowVars.retryableFlow">
+                    <flow-ref name="sendCEMToRetryableTopic" doc:name="sendCEMToRetryableTopic"/>
+                </enricher>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" doc:name="Connectlogger" logMessage=":: sending cem to non retryable queue ::" processState="102008105"/>
+                <jms:outbound-endpoint queue="${connect.exception.handler.nonretriable.queue.name}" connector-ref="EH_ActiveMQGlblConn" doc:name="send CEE to non retryable queue"/>
+            </otherwise>
+        </choice>
+
+
+    </sub-flow> 
+    <sub-flow name="Transform_original_message">
+       
+        <choice doc:name="check the original message">
+            <when expression="#[payload.getOriginalMessage()!=null &amp;&amp; payload.getOriginalMessage().getAny() != null]">
+                <set-payload value="#[payload.getOriginalMessage().getAny()]" doc:name="Set Payload"/>
+                 <enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+		            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)] " processState="102008960" doc:name="Connectlogger"/>
+		        </enricher>  
+                <set-property propertyName="serviceName" value="#[payload.getEnterpriseHeader().getServiceName()]" doc:name="Property"/>
+                <mulexml:jaxb-object-to-xml-transformer jaxbContext-ref="JAXB_Context" doc:name="JAXB Object to XML"/>
+
+
+
+
+                <mulexml:xml-prettyprinter-transformer/>
+                <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="CEE body is not a proper payload" processState="102008103" doc:name="Connectlogger"/>
+
+            </otherwise>
+        </choice>
+            
+    </sub-flow>
+    <sub-flow name="Transform_exception_message">
+        <choice doc:name="check connect enterpeice exception">
+            <when expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseException]">
+                <mulexml:jaxb-object-to-xml-transformer jaxbContext-ref="JAXB_Context" doc:name="JAXB Object to XML"/>
+
+
+
+
+                 <mulexml:xml-prettyprinter-transformer/>
+                <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="CEE  is not a proper payload" processState="102008104" doc:name="Connectlogger"/>
+
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <sub-flow name="sendCEMToRetryableTopic">
+     <set-payload value="#[flowVars[CEHConstants.VAR_ORIGINAL_NATIVE_MSG]]" doc:name="set CEM as payload"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: sending cem to retryable virtual topic ::" processState="102008106" doc:name="Connectlogger"/>
+                <jms:outbound-endpoint topic="${connect.exception.handler.retriable.topicName}" connector-ref="EH_ActiveMQGlblConn" doc:name="send CEM to Retryable topic">
+                    <jms:transaction action="ALWAYS_BEGIN"/>
+                </jms:outbound-endpoint>
+    </sub-flow> 
+    
+    <sub-flow name="setproperties">
+        <expression-component doc:name="Expression"><![CDATA[message.outboundProperties[CEHConstants.VAR_MESSAGE_ID]=payload.messageId != null ?payload.messageId : message.id;
+message.outboundProperties[CEHConstants.VAR_SERVICE_NAME]=payload.serviceName != null ? payload.serviceName : '' ;
+message.outboundProperties[CEHConstants.VAR_MESSAGE_SOURCE]=payload.messageSource != null ? payload.messageSource : '';
+message.outboundProperties[CEHConstants.VAR_MESSAGE_ACTION]=payload.getOriginalMessage() != null ?payload.getOriginalMessage().getAny().getEnterpriseHeader().getAction(): null;
+message.outboundProperties[CEHConstants.VAR_COMMUNICATION_TYPE]=payload.getOriginalMessage()!=null?payload.getOriginalMessage().getAny().getEnterpriseHeader().getCommunication(): null;
+message.outboundProperties[CEHConstants.VAR_SOURCE_SYSTEM]=payload.getOriginalMessage()!=null?payload.getOriginalMessage().getAny().getEnterpriseHeader().getSourceSystem(): null;
+ ]]></expression-component>
+       
+    </sub-flow> 
+    
+    <sub-flow name="reciever_message_send_email">
+
+        <component class="com.redn.connect.processor.connecteh.SMTPComponentHandler" doc:name="SMTP Component Handler"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Sending Email Notification :: " processState="102008110" doc:name="Connectlogger"/>
+        <smtp:outbound-endpoint host="${connect.global.notification.smtp.host}"  user="${connect.global.notification.smtp.userName}" password="${connect.global.notification.smtp.password}" connector-ref="SMTP" to="${connect.global.notification.smtp.email.to}" from="${connect.global.notification.smtp.userName}" subject="${connect.global.notification.smtp.email.subject}" responseTimeout="10000" doc:name="SMTP"  port="${connect.global.notification.smtp.port}">
+        	 <property key="mail.smtp.starttls.enable" value="true"/>
+             <property key="mail.smtp.ssl.trust" value="${connect.global.notification.smtp.host}"/> 
+        </smtp:outbound-endpoint>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Successfully sent email for CEE :: " processState="204008140" doc:name="Connectlogger"/>
+
+    </sub-flow>
+  
+</mule>

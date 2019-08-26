@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+ <spring:beans>
+        <spring:bean id="ConnectConfigBean" name="ConnectConfigBeanCEH" class="com.redn.connect.processor.connectconfig.ConnectConfiguration">
+            
+            <spring:property name="location" value="connect_config_exceptionHandler.properties"/>
+        </spring:bean>
+    </spring:beans>
+
+    <configuration doc:name="Configuration">
+		<expression-language autoResolveVariables="true">
+			<import class="com.redn.connect.connecteh.constants.CEHConstants" />
+			<import class="com.redn.connect.constants.ConnectConstants" />
+			<import class="com.redn.connect.exception.Category" />
+			<import class="com.redn.connect.util.ConnectUtils" />
+		</expression-language>
+	</configuration>
+</mule>

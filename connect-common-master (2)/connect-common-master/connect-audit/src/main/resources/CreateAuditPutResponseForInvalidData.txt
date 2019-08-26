@@ -1,0 +1,14 @@
+import com.redn.connect.audit.pojo.json.AuditPutResponse;
+import com.redn.connect.audit.pojo.json.AuditPutResponseJson;
+import java.util.ArrayList;
+import java.util.List;
+
+
+auditPutResponse = new AuditPutResponse();
+auditPutResponse.setStatusId("false");
+auditPutResponse.setComment("Invalid input data");
+auditPutResponseList = new ArrayList();
+auditPutResponseList.add(auditPutResponse);
+auditPutResponseJson = new AuditPutResponseJson();
+auditPutResponseJson.setAuditPutResponse(auditPutResponseList);
+payload = auditPutResponseJson;

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+	<choice-exception-strategy name="Choice_Exception_Strategy">
+		<catch-exception-strategy
+			when="#[exception.causedBy(org.mule.api.transformer.TransformerException)]"
+			doc:name="transformerException">
+
+			<flow-ref name="transformerException" doc:name="transformerException"
+				doc:description="Refers to common error handling sub-flow" />
+		</catch-exception-strategy>
+
+		<catch-exception-strategy
+			when="#[exception.causedBy(org.mule.api.lifecycle.LifecycleException)]"
+			doc:name="LifecycleException">
+
+			<flow-ref name="lifecycleException" doc:name="lifecycleException"
+				doc:description="Refers to common error handling sub-flow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(javax.jms.JMSException)]" doc:name="JMSException">
+
+			<flow-ref name="JMSException" doc:name="JMSException"
+				doc:description="Refers to common error handling sub-flow" />
+		</catch-exception-strategy>
+
+		<catch-exception-strategy
+			when="#[exception.causedBy(org.mule.api.routing.filter.FilterUnacceptedException)]"
+			doc:name="FilterUnacceptedException">
+
+			<flow-ref name="FilterUnacceptedException" doc:name="FilterUnacceptedException" />
+
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(java.net.ConnectException)]" doc:name="ConnectException">
+
+			<flow-ref name="ConnectException" doc:name="ConnectException" />
+
+		</catch-exception-strategy>
+		<catch-exception-strategy doc:name="AnyOtherExceptionCatchExceptionStratagy">
+
+			<flow-ref name="SubHandleOtherExceptionflow" doc:name="SubHandleOtherExceptionflow"
+				doc:description="Refers to common error handling sub-flow" />
+		</catch-exception-strategy>
+	</choice-exception-strategy>
+	<sub-flow name="JMSException">
+		<expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPConnectConstants.ERROR_CODE_JMS;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_ACTIVEMQ;]]></expression-component>
+		<flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage" />
+	</sub-flow>
+	<sub-flow name="lifecycleException">
+		<expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPConnectConstants.ERROR_CODE_LIFE_CYCLE;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_HTTP_CONNECT;]]></expression-component>
+		<flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage" />
+	</sub-flow>
+	<sub-flow name="FilterUnacceptedException">
+		<expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPConnectConstants.ERROR_CODE_FILTER_UNACCEPTED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=ConnectConstants.CONST_MESSAGE_ENTERPRISE_MESSAGE_VALIDATION_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_PARTNER;]]></expression-component>
+		<flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage" />
+	</sub-flow>
+	<sub-flow name="SubHandleOtherExceptionflow">
+		<expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPConnectConstants.ERROR_CODE_OTHER;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_HTTP_CONNECT;]]></expression-component>
+		<flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage" />
+	</sub-flow>
+	<sub-flow name="ConnectException">
+		<expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPConnectConstants.ERROR_CODE_CONNECT_EXCEPTION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_HTTP_CONNECT;]]></expression-component>
+		<flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage" />
+	</sub-flow>
+
+	<sub-flow name="transformerException">
+		<expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPConnectConstants.ERROR_CODE_TRANSFORMER_EXCEPTION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_HTTP_CONNECT;]]></expression-component>
+		<flow-ref name="createEnterpriseExceptionMessage" doc:name="createEnterpriseExceptionMessage" />
+	</sub-flow>
+	<sub-flow name="createEnterpriseExceptionMessage">
+		<connectlogger:error config-ref="Connectlogger__Configuration"
+			logMessage=" ErrorMessage of Http is : #[flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]]"
+			processState="#[flowVars[ConnectConstants.VAR_ERROR_CODE]]" doc:name="Connectlogger" />
+
+		<custom-transformer
+			class="com.redn.connect.transformer.CreateXMLEnterpriseExceptionTransformer"
+			doc:name="Create XML Enterprise Exception"
+			doc:description="Creates an Enterprise Exception Java object using the JAXB generated POJO" />
+		<jms:outbound-endpoint queue="${connect.httpconnect.exception.queue.name}"
+			doc:name="Send Exception to CEH"
+			doc:description="Route Enterprise Exception Message to Global Exception Handler queue."
+			connector-ref="Active_MQ" />
+		<mulexml:jaxb-object-to-xml-transformer
+			jaxbContext-ref="JAXB_Context" doc:name="JAXB Object to XML" />
+	</sub-flow>
+
+</mule>

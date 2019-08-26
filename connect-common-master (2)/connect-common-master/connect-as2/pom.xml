@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+      		<groupId>com.redn.connect</groupId>
+      		<artifactId>connect-global-dependencies</artifactId>
+      		<version>1.2</version>
+   	</parent>
+	<groupId>com.redn.connect</groupId>
+	<artifactId>connect-as2</artifactId>
+    <version>1.2</version>
+    <packaging>mule</packaging>
+	<name>Mule connect-as2 Application</name>
+	
+	<properties>
+		<as2.version>2.1.0</as2.version>
+	</properties>
+	
+	<build>
+		<plugins>
+			<!-- AS2 Start -->
+			<plugin>
+    			<groupId>org.mule.tools.maven</groupId>
+    			<artifactId>mule-app-maven-plugin</artifactId>
+				<version>${mule-app-maven-plugin-version}</version>
+    			<extensions>true</extensions>
+   				<configuration>
+					<copyToAppsDirectory>true</copyToAppsDirectory>
+        			<excludeMuleDependencies>false</excludeMuleDependencies>
+        			<inclusions>
+            			<inclusion>
+                			<groupId>com.modus</groupId>
+               				<artifactId>mule-connector-as2</artifactId>
+            			</inclusion>
+        			</inclusions>
+   			   </configuration>
+			</plugin>
+			<!-- AS2 End -->
+        </plugins>
+    </build>
+
+	<dependencies>
+		<!-- AS2 Module -->
+		<dependency>
+    		<groupId>com.modus</groupId>
+    		<artifactId>mule-connector-as2</artifactId>
+   			<version>${as2.version}</version>
+			<scope>provided</scope>			
+		</dependency>
+    </dependencies>
+</project>

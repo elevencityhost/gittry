@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:data-mapper="http://www.mulesoft.org/schema/mule/ee/data-mapper"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:context="http://www.springframework.org/schema/context" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/data-mapper http://www.mulesoft.org/schema/mule/ee/data-mapper/current/mule-data-mapper.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+<!--     <context:property-placeholder location="connect_config_auditapi.properties" />
+ -->    
+   
+      <spring:beans>
+        <spring:bean id="connectConfigBean" name="connectConfigBean" class="com.redn.connect.processor.connectconfig.ConnectConfiguration">
+
+            <spring:property name="location" value="connect_config_auditapi.properties"/>
+        </spring:bean>
+    </spring:beans>
+    
+  <apikit:config name="Router" raml="auditapi.raml" consoleEnabled="true" consolePath="console" doc:name="Router" />
+    <http:listener-config name="HTTP_Listener_Configuration" host="${audit.component.inbound.endpoint.host}" port="${audit.component.inbound.endpoint.port}" 
+    doc:name="HTTP Listener Configuration" />
+    <!--  http port       /cnaudit/*                -->
+
+    <spring:beans>
+        <spring:bean id="dataSource" name="dataSource" class="org.enhydra.jdbc.standard.StandardDataSource">
+            <spring:property name="user" value="${cndb.audit.username}"/>
+            <spring:property name="driverName" value="${cndb.audit.driverClassName}"/>
+            <spring:property name="password" value="${cndb.audit.password}"/>
+            <spring:property name="url" value="${cndb.audit.url}"/>
+
+        </spring:bean>
+    </spring:beans>
+    <db:generic-config name="Generic_Database_Configuration" dataSource-ref="dataSource" doc:name="Generic Database Configuration"/>
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-audit-logger" doc:name="Connectlogger: Configuration"/>
+    <flow name="audit-api-router">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/audit" doc:name="HTTP" />
+
+        <apikit:router config-ref="Router" doc:name="APIkit Router" />
+    </flow>
+
+
+    <flow name="get:/audit:Router">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="GET audit triggerred" processState="102007100" doc:name="Connectlogger"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[message.inboundProperties.'http.query.params'.job_id] " processState="102007120" doc:name="Connectlogger"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Log Audit Records lookup is initiated" processState="102007130" doc:name="Connectlogger"/>
+
+        <flow-ref name="auditGetSubFlow" doc:name="auditGetSubFlow"/>
+
+    </flow>
+        <sub-flow name="auditGetSubFlow" >
+        <set-variable variableName="resource_id" value="#[message.inboundProperties.'http.query.params'.job_id]" doc:name="set-resource-id"/>
+
+		<set-variable variableName="qry_get_audit_record_details_var"
+			value="${qry_get_audit_record_details}" doc:name="set-get-records-query" />
+		<db:select config-ref="Generic_Database_Configuration"
+			doc:name="get-job-details"
+			doc:description="This database connector is used to get the audit record details">
+            <db:dynamic-query><![CDATA[#[flowVars.qry_get_audit_record_details_var]]]></db:dynamic-query>
+
+		</db:select>
+        <dw:transform-message metadata:id="21f3147d-e08c-4acf-8148-d5fe317f4d70" doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	auditGetResponse: payload map ((payload01 , indexOfPayload01) -> {
+		batch_counter: payload01.BATCH_COUNTER,
+		comment: payload01.COMMENTS,
+		created_dt: payload01.CREATED_DT,
+		external_id: payload01.EXTERNAL_ID,
+		interface_id: payload01.INTERFACE_ID,
+		job_id: payload01.JOB_ID,
+		phase_id: payload01.PHASE_ID,
+		prop_name: payload01.PROP_NAME,
+		prop_value: payload01.PROP_VALUE,
+		status_id: payload01.STATUS_ID,
+		system_id: payload01.SYSTEM_ID
+	})
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+
+		<object-to-string-transformer doc:name="object-to-string" />
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="::after retreival ::  #[payload]" processState="102007140" doc:name="Connectlogger"/>
+
+		<choice doc:name="if-payload-is-not-empty">
+			<when expression="#[json:auditGetResponse[0] != null]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[message]" processState="102007150" doc:name="Connectlogger"/>
+
+
+			</when>
+			<otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="invalid payload" processState="102007160" doc:name="Connectlogger"/>
+
+
+
+			</otherwise>
+		</choice>		
+    </sub-flow>
+    
+        <flow name="post:/audit:application/json:Router">
+        
+                <set-session-variable variableName="messageId" value="#[json://auditPostRequest/job_id]" doc:name="messageId"/>
+        <set-session-variable variableName="messageSource" value="#[json://auditPostRequest/interface_id]" doc:name="messageSource"/>
+        <set-session-variable variableName="messageAction" value="Insert" doc:name="messageAction"/>
+
+	     <flow-ref name="auditPostSubFlow" doc:name="auditPostSubFlow"/>
+        		
+
+    </flow>
+    <sub-flow name="auditPostSubFlow" >
+        
+		<custom-transformer class="com.redn.connect.audit.PayloadNormalizerTransformer"
+			doc:name="payload-normalizer"
+			doc:description="transform the request(XML or JSON) to message to list object. XML format is not using any more but kept it as is because it doesn't impact functionality  " />
+
+        <set-variable variableName="resource_id" value="#[payload['auditPostRequest']['job_id']]" doc:name="set-resource-id"/>
+        <set-variable variableName="qry_insert_audit_record_var"
+				value="${qry_insert_audit_record}" doc:name="set-insert-record-query" />
+        <db:insert config-ref="Generic_Database_Configuration"
+				doc:name="insert-audit-record" doc:description="Insert audit record into database.">
+            <db:dynamic-query><![CDATA[#[flowVars.qry_insert_audit_record_var]]]></db:dynamic-query>
+
+
+
+			</db:insert>
+        <expression-component doc:name="Create status response"><![CDATA[import com.redn.connect.audit.pojo.json.StatusResponseJson;
+import com.redn.connect.audit.pojo.json.StatusResponse;
+statusResponse = new StatusResponse();
+statusResponse.setStatus("true");
+statusResponseJson = new StatusResponseJson();
+statusResponseJson.setStatusResponse(statusResponse);
+payload = statusResponseJson;]]></expression-component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Log Audit record inserted successfully" processState="102007170" doc:name="Connectlogger"/>
+
+	
+    </sub-flow>
+    
+    
+    
+    <flow name="get:/verify:Router">
+        <set-variable variableName="messageAction" value="Verify Get (Getting Validation Status)" doc:name="messageAction"/>
+        <logger level="INFO" doc:name="Logger" message="Log Verification Status check initiated"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Log Verification Status check initiated" processState="102007180" doc:name="Connectlogger"/>
+        <flow-ref name="auditVerifySubFlow" doc:name="auditVerifySubFlow"/>
+
+    </flow>
+    <sub-flow name="auditVerifySubFlow">
+        <set-variable variableName="job_id" value="#[message.inboundProperties.job_id]" doc:name="job_id"/>
+        <set-variable variableName="props" value="#[message.inboundProperties.props]" doc:name="props"/>
+        <set-variable variableName="system_id" value="#[message.inboundProperties.system_id]" doc:name="system_id"/>
+        <set-variable variableName="interface_id" value="#[message.inboundProperties.interface_id]" doc:name="interface_id"/>
+        <set-variable variableName="qry_validation_status_get_prop_name_status_var" value="${qry_get_validation_status_get_prop_name_status}" doc:name="set-validation_status-query"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: input props :: #[flowVars.props]" processState="102007190" doc:name="Connectlogger"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: JSON message tranformed successfully. Verification for job_id:: #[flowVars.job_id] and interface_id :: #[flowVars.interface_id] Started" processState="102007200" doc:name="Connectlogger"/>
+
+        <db:select config-ref="Generic_Database_Configuration" doc:name="Database">
+            <db:dynamic-query><![CDATA[#[flowVars.qry_validation_status_get_prop_name_status_var]]]></db:dynamic-query>
+
+        </db:select>
+        <choice doc:name="if-payload-is-not-empty">
+            <when expression="#[payload != empty]">
+                <component class="com.redn.connect.audit.AuditValidation" doc:name="audit-validation" doc:description="Validate audit records"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Audit verification status :: #[message.payload]" processState="102007210" doc:name="Connectlogger"/>
+
+                <choice doc:name="Choice">
+                    <when expression="#[payload != empty]">
+                        <dw:transform-message metadata:id="2c91559a-184d-405a-8d7c-a82affb3d116" doc:name="Transform Message">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	auditPutResponse: payload map ((payload01 , indexOfPayload01) -> {
+		prop_name: payload01.PROP_NAME,
+        status: true when payload01.status_id == "1" otherwise (false), 
+        comment: "Validation successful" when payload01.status_id == "1" 
+        otherwise ("Validation failed" when payload01.status_id == "-1" 
+        otherwise "Validation not initialized"
+        ),
+      
+		system_id: payload01.SYSTEM_ID
+	})
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                        <object-to-string-transformer doc:name="Object to String"/>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=" Audit verification job  successful" processState="102007220" doc:name="Connectlogger"/>
+
+                    </when>
+                    <otherwise>
+                        <custom-transformer class="com.redn.connect.audit.InvalidPropertiesException" doc:name="Create Audit Put Response"/>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="No audit reords are available to get validation status with provided details" processState="102007230" doc:name="Connectlogger"/>
+
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <expression-component file="D:\testfolder\CreateAuditPutResponseForInvalidData.txt" doc:name="Expression"/>
+                
+                
+                <!-- "C:\Users\invenio\AnypointStudio\workspace\connect-audit\src\main\resources\CreateAuditPutResponseForInvalidData.txt" doc:name="Audit Verify Response"/> -->
+                
+                
+                
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Log no audit reords are available to get validation status with provided details" processState="102007240" doc:name="Connectlogger"/>
+
+            </otherwise>
+        </choice>
+		
+    </sub-flow>
+    
+     <flow name="put:/verify:application/json:Router">
+
+  		<set-session-variable variableName="messageId" value="#[json://auditPutRequest/job_id]" doc:name="messageId"/>
+        <set-session-variable variableName="messageSource" value="#[json://auditPutRequest/interface_id]" doc:name="messageSource"/>
+        <set-session-variable variableName="messageAction" value="VerifyPut (Getting the Validation Status)" doc:name="messageAction"/>
+        <set-session-variable variableName="resourceId" value="#[json://auditPutRequest/system_id]" doc:name="resourceId"/>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Verify Status check initiated" processState="102007250" doc:name="Connectlogger"/>
+
+        <flow-ref name="auditPutSubFlow" doc:name="auditPutSubFlow"/>
+    </flow>
+    
+     <sub-flow name="auditPutSubFlow" >
+		<custom-transformer class="com.redn.connect.audit.PayloadNormalizerTransformer"
+			doc:name="payload-normalizer"
+			doc:description="transform the request(XML or JSON) to message to list object. XML format is not using any more but kept it as is because it doesn't impact functionality  " />
+		<set-variable variableName="resource_id"
+			value="#[payload['auditPutRequest']['job_id']]" doc:name="set-resource-id" />
+		<set-variable variableName="props"
+			value="#[payload['auditPutRequest']['prop_name']]" doc:name="set-property-name"
+			doc:description="Store the properties in a variable to use this 'AuditValidation' class to filter records." />
+        <set-variable variableName="systemId" value="#[payload['auditPutRequest']['system_id']]" doc:name="store-system-id"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="input props: #[flowVars.props]" processState="102007260" doc:name="Connectlogger"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: JSON message tranformed successfully. Verification for job_id :: #[payload['auditPutRequest']['job_id']] and interface_id:: #[payload['auditPutRequest']['interface_id']] Started" processState="102007270" doc:name="Connectlogger"/>
+
+
+		<set-variable variableName="qry_validation_status_get_prop_name_status_var"
+			value="${qry_get_validation_status_put_prop_name_status}" doc:name="set-validation_status-query" />
+		<db:select config-ref="Generic_Database_Configuration"
+			doc:name="get-property-name-and-status-id" doc:description="Get records to be validate from database.">
+            <db:dynamic-query><![CDATA[#[flowVars.qry_validation_status_get_prop_name_status_var]]]></db:dynamic-query>
+
+
+
+		</db:select>
+		<choice doc:name="if-payload-is-not-empty">
+			<when expression="#[payload != empty]">
+				<component class="com.redn.connect.audit.AuditValidation" doc:name="audit-validation"
+					doc:description="Validate audit records" />
+                <choice doc:name="Choice">
+                    <when expression="#[payload != empty]">
+                        <dw:transform-message metadata:id="b26ddf88-9dbc-4618-bb40-88d15ee86f2d" doc:name="Transform Message">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	auditPutResponse: payload map ((payload01 , indexOfPayload01) -> {
+		prop_name: payload01.PROP_NAME,
+		
+		status: true when payload01.status_id == "1" otherwise (false), 
+        comment: "Validation successful" when payload01.status_id == "1" 
+        otherwise ("Validation failed" when payload01.status_id == "-1" 
+        otherwise "Validation not initialized"
+        ),
+		system_id: payload01.SYSTEM_ID
+	})
+}]]></dw:set-payload>
+                        </dw:transform-message>
+
+
+                    </when>
+                    <otherwise>
+                         <custom-transformer class="com.redn.connect.audit.InvalidPropertiesException" doc:name="Create Audit Put Response"/>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="No audit reords are available to get validation status with provided details" processState="102007280" doc:name="Connectlogger"/>
+
+
+                    </otherwise>
+                </choice>
+
+
+			</when>
+			<otherwise>
+                <expression-component doc:name="Create Audit Put Response" file="CreateAuditPutResponseForInvalidData.txt"></expression-component>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=" No audit reords are available to get validation status with provided details" processState="102007290" doc:name="Connectlogger"/>
+
+
+			</otherwise>
+		</choice>		
+    </sub-flow>
+    
+       
+    
+    <flow name="get:/validate:Router">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Get Output Counter property value initiated" processState="102007300" doc:name="Connectlogger"/>
+
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="job_id" value="#[message.inboundProperties['job_id']]"/>
+            <add-message-property key="interface_id" value="#[message.inboundProperties['interface_id']]"/>
+        </message-properties-transformer>
+        <flow-ref name="validateGetSubFlow" doc:name="validateGetSubFlow"/>    </flow>
+    <sub-flow name="validateGetSubFlow" >
+        
+		<set-variable variableName="qry_get_output_counter_property_value_var"
+			value="${qry_get_output_counter_property_value}" doc:name="Variable" />
+		<db:select config-ref="Generic_Database_Configuration"
+			doc:name="get-property-value" doc:description="Get 'OUTPUT_COUNTER' property value with provide values">
+            <db:dynamic-query><![CDATA[#[flowVars.qry_get_output_counter_property_value_var]]]></db:dynamic-query>
+
+
+
+		</db:select>
+        <choice doc:name="if-property-value-available">
+            <when expression="#[payload != empty]">
+            
+            
+                                    <dw:transform-message metadata:id="b26ddf88-9dbc-4618-bb40-88d15ee86f2d" doc:name="Transform Message">
+                            <dw:input-payload mimeType="application/java"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	outputCounterResponse: payload map ((payload01 , indexOfPayload01) -> {
+		output_count: payload01.OUTPUT_COUNTER
+	})
+}]]></dw:set-payload>
+                        </dw:transform-message>
+            
+                <object-to-string-transformer doc:name="Object to String"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Retreived OUTPUT_COUNTER property valu" processState="102007310" doc:name="Connectlogger"/>
+
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;OUTPUT_COUNT&quot; : &quot;Not Available&quot; }" doc:name="Create Response"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="No OUTPUT_COUNTER property is availble with provided values" processState="102007320" doc:name="Connectlogger"/>
+
+            </otherwise>
+        </choice>
+
+
+    </sub-flow>
+    
+    
+
+
+
+    <flow name="put:/validate:application/json:Router">
+                <set-session-variable variableName="messageId" value="#[json://validationPutRequest/job_id]" doc:name="messageId"/>
+        <set-session-variable variableName="messageSource" value="#[json://validationPutRequest/interface_id]" doc:name="messageSource"/>
+        <set-session-variable variableName="messageAction" value="Validate Put (Executing Validation)" doc:name="messageAction"/>
+        <set-session-variable variableName="resourceId" value="#[json://validationPutRequest/system_id]" doc:name="resourceId"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Audit validation started" processState="102007330" doc:name="Connectlogger"/>
+
+
+        <flow-ref name="validatePutSubFlow" doc:name="Validate Put SubFlow"/>
+	
+	</flow>
+    <sub-flow name="validatePutSubFlow" >
+		<custom-transformer class="com.redn.connect.audit.PayloadNormalizerTransformer"
+			doc:name="payload-normalizer"
+			doc:description="transform the request(XML or JSON) to message to list object. XML format is not using any more but kept it as is because it doesn't impact functionality  " />
+		<set-variable variableName="resource_id"
+			value="#[payload['validationPutRequest']['job_id']]" doc:name="set-resource-id" />
+		<set-variable variableName="inputmsg" value="#[payload]"
+			doc:name="store-payload" doc:description="Store paylaod to use in database connector." />
+		<set-variable variableName="props"
+			value="#[flowVars.inputmsg['validationPutRequest']['prop_name']]" doc:name="store-property-name"
+			doc:description="Store property name to use while validating." />
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Audit validation for interface = #[payload['validationPutRequest']['interface_id']] and job_id=#[payload['validationPutRequest']['job_id']] and system_id=#[payload['validationPutRequest']['system_id']]" processState="102007340" doc:name="Connectlogger"/>
+
+
+		<set-variable variableName="qry_validation_audit_get_phaseid_prop_name_var"
+			value="${qry_validation_audit_get_phaseid_prop_name}" doc:name="store-get-phase-id-prop-name-qry" />
+		<db:select config-ref="Generic_Database_Configuration"
+			doc:name="get-audit-record-details">
+            <db:dynamic-query><![CDATA[#[flowVars.qry_validation_audit_get_phaseid_prop_name_var]]]></db:dynamic-query>
+
+		</db:select>
+		<choice doc:name="if-payload-not-empty">
+			<when expression="#[payload != empty]">
+				<component class="com.redn.connect.audit.AuditValidation" doc:name="audit-validation"
+					doc:description="Audit record validation" />
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Audit validation logic executed and database update initiated" processState="102007350" doc:name="Connectlogger"/>
+
+
+				<json:object-to-json-transformer
+					doc:name="object-to-json" />
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[payload]" processState="102007360" doc:name="Connectlogger"/>
+
+                <dw:transform-message metadata:id="78c6b58f-5804-47bd-8550-ef9fec6d77b9" doc:name="Transform Message">
+                    <dw:input-payload mimeType="application/json"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	STATUS: "0" when payload01.STATUS == "2" otherwise payload01.STATUS,
+	PROP_NAME: payload01.PROP_NAME,
+	COMMENT: "Validation success" when payload01.STATUS == "1" 
+        otherwise ("Invalid Property Name" when payload01.STATUS == "0" 
+		otherwise ("Validation Failed" when payload01.STATUS == "-1" 
+		otherwise ("Header Value Not registered, so validation not done" when payload01.STATUS == "2"
+        otherwise "Incorrect details"
+        )))
+})]]></dw:set-payload>
+                </dw:transform-message>
+
+
+                <enricher target="temp" doc:name="Message Enricher">
+                    <foreach collection="#[payload]" doc:name="For Each">
+                        <set-variable variableName="qry_validation_audit_update_status_var" value="${qry_validation_audit_update_status}" doc:name="store-update-status-qry"/>
+                        <db:update config-ref="Generic_Database_Configuration" doc:name="update-validation-status" doc:description="Update the audit record status with validation status.">
+                            <db:dynamic-query><![CDATA[#[flowVars.qry_validation_audit_update_status_var]]]></db:dynamic-query>
+
+                        </db:update>
+                    </foreach>
+                </enricher>
+                <dw:transform-message metadata:id="ef3196ff-5231-467f-b433-bc129dfe91be" doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	validationPutResponse: [{
+		comment: payload.COMMENT,
+		prop_name: payload.PROP_NAME,
+		status_id: payload.STATUS
+	}]
+}]]></dw:set-payload>
+                </dw:transform-message>
+
+                <object-to-string-transformer doc:name="Object to String"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="validation check is completed" processState="102007370" doc:name="Connectlogger"/>
+
+
+			</when>
+			<otherwise>
+                <expression-component file="CreateValidationPutResponseForInvalidData.txt" doc:name="Create Response"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="No audit reords are available with provided details to do audit validation" processState="102007380" doc:name="Connectlogger"/>
+
+
+			</otherwise>
+		</choice>
+	
+    </sub-flow>
+   
+    <flow name="get:/generate-uid:Router">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Generating Unique Id " processState="102007390" doc:name="Connectlogger"/>
+
+		<set-payload value="{&quot;job_uid&quot;:&quot;#[java.util.UUID.randomUUID().toString()]&quot;}"
+			doc:name="set-unique-id-as-json" doc:description="Make a json object and send as response." />
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=" Job id generated successfully" processState="102007400" doc:name="Connectlogger"/>
+
+    </flow>
+    
+</mule>

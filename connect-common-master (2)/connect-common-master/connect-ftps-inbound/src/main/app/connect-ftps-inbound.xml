@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ftps="http://www.mulesoft.org/schema/mule/ftps"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ftps http://www.mulesoft.org/schema/mule/ftps/current/mule-ftps.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+	<file:connector name="File"
+		outputPattern="#[message.inboundProperties.fileName]" autoDelete="true"
+		streaming="true" validateConnections="true" doc:name="File" />
+	<jms:activemq-connector name="Active_MQ"
+		specification="1.1" username="admin" password="admin" brokerURL="tcp://localhost:61616"
+		validateConnections="true" doc:name="Active MQ" />
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="FTPS_inbound_Logger" doc:name="Connectlogger: Configuration" />
+    <ftps:config name="FTPS__Basic_Configuration" port="990" username="FTPSUser" password="Shruthi2#" keyStorePath="E:\keystore_21\certificate.jks" keyStorePassword="testserver" doc:name="FTPS: Basic Configuration"/>
+	<!-- <ftps:config name="FTPS_Basic_Configuration" port="990"
+		username="FTPSUser" password="Shruthi2#" keyStorePath="E:\keystore_21\certificate.jks"
+		keyStorePassword="testserver" doc:name="FTPS: Basic Configuration" /> -->
+	<flow name="connect-ftps-inbound">
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			doc:name="Connectlogger"
+			logMessage="Message received for ftps-inbound for #[flowVars.#[FTPSInboundConstants.VENDOR_NAME]]"
+			processState="102022101" />
+		<flow-ref name="archive" doc:name="archive" />
+		<set-property propertyName="fileName"
+			value="#[message.inboundProperties.fileName]" doc:name="fileName-outbound " />
+        <set-property propertyName="serviceName" value="#[FTPSInboundConstants.I1KNBD002]" doc:name="msgSelectorKey"/>
+		<jms:outbound-endpoint 
+			connector-ref="activeMQGlblConn" doc:name="JMS" topic="${connect.ftpsinb.topic}"/>
+        <exception-strategy ref="ftpsInboundChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+
+	</flow>
+	<flow name="archive">
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Archiving for #[flowVars.#[FTPSInboundConstants.VENDOR_NAME]]"
+			processState="102022103" doc:name="Connectlogger" />
+		<file:outbound-endpoint path="${connect.ftpsinb.archive.path}"
+			connector-ref="File" responseTimeout="10000" doc:name="Archiving_File" />
+        <exception-strategy ref="ftpsInboundChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+	</flow>
+</mule>

@@ -1,0 +1,42 @@
+gitproject=$2
+mvnproject=$3
+workingDir="$(pwd)"
+cd $gitproject
+pwd
+echo "#### STARTED - Installing Application to Local Repository ####"
+if mvn clean install ; then
+        echo "#### SUCCESSFUL - Installing Application to Local Repository ####"
+else
+        echo "#### FAILED - Installing Application to Local Repository ####"
+        exit 1
+fi
+cd target
+applicationName="$(ls | grep $mvnproject)"
+echo $applicationName
+application=${applicationName:0:${#applicationName}-4}
+cd $workingDir/../deploy-connect-jenkins-mule/connect-jenkins-mule
+pwd
+echo "#### STARTED - Undeploying previous version of application: $application"
+if mvn clean install exec:java -DoperationType=1 -Denv=$1 -DapplicationName=${application} -DwaitTimeInSecs=$4 -DnoOfRetries=$5 ; then
+        echo "#### SUCCESSFUL - Undeploying previous version of application: $application"
+else
+        echo "#### FAILED - Undeploying previous version of application: $application"
+        exit 1
+fi
+cd $workingDir/$gitproject
+echo "#### STARTED - Deploying Application: $applicationName"
+if mvn mule:deploy -Denv=$1 ; then
+        echo "#### SUCCESSFUL - Deploying Application: $applicationName"
+else
+        echo "#### FAILED - Deploying Application: $applicationName"
+        exit 1
+fi
+cd $workingDir/../deploy-connect-jenkins-mule/connect-jenkins-mule
+pwd
+echo "#### STARTED - Verifying Deployment for application: $applicationName"
+if mvn clean install exec:java -DoperationType=2 -Denv=$1 -DapplicationName=${application} -DwaitTimeInSecs=$4 -DnoOfRetries=$5 ; then
+        echo "#### SUCCESSFUL - Verifying Deployment for application: $applicationName"
+else
+        echo "#### FAILED - Verifying Deployment for application: $applicationName"
+        exit 1
+fi

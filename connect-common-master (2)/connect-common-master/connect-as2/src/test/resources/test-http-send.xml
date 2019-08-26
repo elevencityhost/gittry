@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:https="http://www.mulesoft.org/schema/mule/https" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:as2="http://www.mulesoft.org/schema/mule/as2" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/as2 http://www.mulesoft.org/schema/mule/as2/current/mule-as2.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+ 
+    <http:endpoint exchange-pattern="request-response" host="${connect.as2.lenovo.send.https.host}" port="${connect.as2.lenovo.send.https.port}" path="${connect.as2.lenovo.send.https.path}" connector-ref="HTTP_Test_Send" method="POST" name="HTTP_AS2_Send_Test_EndPoint" responseTimeout="${connect.as2.lenovo.send.https.response.timeout}" doc:name="HTTPS">
+        <reconnect frequency="${connect.as2.lenovo.send.https.reconnection.frequency}" count="${connect.as2.lenovo.send.https.reconnection.attempts}"/>
+    </http:endpoint>
+    <http:connector name="HTTP_Test_Send" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS" connectionTimeout="${connect.as2.lenovo.send.https.connection.timeout}">
+    </http:connector>
+    <as2:config name="AS2_Send_Test_HTTP_Configuration" httpEndpointRef="HTTP_AS2_Send_Test_EndPoint" doc:name="AS2: HTTPS Configuration"/>
+
+    <flow name="test-send-flow">
+    	<as2:send config-ref="AS2_Send_Test_HTTP_Configuration" as2From="${connect.as2.lenovo.send.from}test" as2To="${connect.as2.lenovo.send.to}test" keyStorePath="as2_teststore2.keystore" keyStorePassword="${connect.as2.lenovo.as2KeyStorePassword}" requestReceipt="signed" sign="true" encrypt="true" doc:name="AS2 - Lenovo - Send" contentType="${connect.as2.lenovo.send.contentType}" receiptTimeout="${connect.as2.lenovo.send.receiptTimeout}" subject="${connect.as2.lenovo.send.subject}" messageId="#[flowVars[ConnectConstants.VAR_MESSAGE_ID]]"/>
+        <flow-ref name="subValidateResponseFromTargetSystem" doc:name="subLogResponseFromTargetSystem"/>
+        <catch-exception-strategy doc:name="lenovo-send-Catch_Exception_Strategy">
+            <expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=AS2Constants.ERROR_CODE_LENOVO_AS2_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]="Error in communicating with Lenovo AS2: " +  exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=AS2Constants.CONST_EXCEPTION_ORIGIN_LENOVO_AS2_HTTPS;]]></expression-component>
+
+            <flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow"/>
+
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

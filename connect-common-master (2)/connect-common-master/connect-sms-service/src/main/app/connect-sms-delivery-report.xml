@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+    <flow name="connect-sms-delivery-reportFlow">
+        <jms:inbound-endpoint exchange-pattern="request-response" queue="${connect.smsservice.dlrReport.queuename}" 
+        connector-ref="Active_MQ" doc:name="JMS-delivery Report queue" responseTimeout="${connect.dlrReport.activemq.queue.timeout.value}">
+            <jms:transaction action="NONE" timeout="${connect.dlrReport.activemq.queue.timeout.value}"/>
+        </jms:inbound-endpoint>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="started delivery report flow" processState="102020200" doc:name="Connectlogger-started delivery report flow"/>
+    	<choice doc:name="Check Payload Type">
+			<when
+				expression="#[payload instanceof java.lang.String  &amp;&amp;  null != payload]">
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					logMessage="Received java.lang.String  As Payload Converting To CEM Object"
+					processState="102020240" doc:name="Connectlogger-Log" />
+				<set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]"
+					doc:name="Set CEM Object As Payload" />
+			</when>
+			<otherwise>
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					logMessage="Received payload is not an instance of string"
+					processState="102020250" doc:name="Connectlogger" />
+			</otherwise>
+		</choice>
+    	
+    	<message-filter throwOnUnaccepted="true" doc:name="Validate Enterprise Message">
+            <expression-filter expression="#[payload !=null &amp;&amp; payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]"/>
+        </message-filter>
+        <expression-component doc:name="Expression-Set Properties"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-sms-service");
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;]]></expression-component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="delivery report payload validated successfully" processState="102020210" doc:name="Connectlogger-started SMS process"/>
+       <enricher doc:name="Message Enricher" target="logCem">
+            <connectlogger:info config-ref="Connectlogger__Configuration" doc:name="Connectlogger-LogCEM" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102020960"/>
+        </enricher>
+        <set-payload value="#[new com.redn.connect.util.ConnectUtils().getPayloadTextContentFromCEM(payload)]" doc:name="Extract payload from CEM"/>
+        <json:json-to-object-transformer doc:name="JSON to Object" returnClass="com.redn.connect.smsservice.pojo.SMSDeliveryReport"/>
+        <flow-ref name="connect-sms-delivery-reportFlow1" doc:name="connect-sms-delivery-reportFlow1"/>
+        <exception-strategy ref="smsserviceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+        
+    
+    </flow>
+    <sub-flow name="generate-sms-delivery-report">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="started database flow" processState="102020220" doc:name="Connectlogger-database flow started"/>
+        <expression-component doc:name="Expression-Set Message Ids"><![CDATA[String temp = "";
+ String[] arr = payload.messageIds.split(",");
+   for(int i = 0; i< arr.length; i++){
+	    if(i < arr.length-1){
+    		 temp = temp.concat("'"+arr[i]+"',");
+    	}else{
+     		temp = temp.concat("'"+arr[i]+"'");
+    	}
+   }
+flowVars.messageIds = temp;
+
+]]></expression-component>
+       
+        <db:select config-ref="MySQL_Configuration" doc:name="Database-Select sms data">
+            <db:dynamic-query><![CDATA[${connect.smsservice.database.dlrReport.selectQuery}]]></db:dynamic-query>
+        </db:select>
+
+        <component class="com.redn.connect.smsservice.processor.PrepareDlrResponseObject" doc:name="Java PrepareDlrResponseObject"/>
+        <json:object-to-json-transformer doc:name="Object to JSON"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Database flow end" processState="102020230" doc:name="Connectlogger-Database Flow end"/>
+    </sub-flow>
+    <flow name="connect-sms-delivery-reportFlow1">
+        <flow-ref name="generate-sms-delivery-report" doc:name="generate-sms-delivery-report"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+			<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=SmsServiceConstants.ERROR_CODE_DB_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=SmsServiceConstants.EXCEPTION_ORIGIN_REDINGTON_GULF;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;]]>
+			</expression-component>
+			<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" />
+		</catch-exception-strategy>
+    </flow>
+</mule>

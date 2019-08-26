@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.redn.connect.jenkins</groupId>
+	<parent>
+      		<groupId>com.redn.connect</groupId>
+      		<artifactId>connect-global-dependencies</artifactId>
+      		<version>1.3</version>
+   	</parent>
+	<artifactId>connect-jenkins-mule</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+	<name>Jenkins-Mule Application</name>
+
+    <properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<maven-compiler-plugin-version>3.6.1</maven-compiler-plugin-version>
+    	<mule.tools.version>1.2</mule.tools.version>
+	</properties>
+	
+	<profiles>
+	<profile>
+			<id>DEV</id>
+			<activation>
+       			<property>
+          			<name>env</name>
+          			<value>dev</value>
+        		</property>
+     	    </activation>
+			<properties>
+				<muleagent.uri>http://172.20.85.115:9998</muleagent.uri>
+			</properties>
+		</profile>
+		<profile>
+			<id>SIT</id>
+			<activation>
+       			<property>
+          			<name>env</name>
+          			<value>sit</value>
+        		</property>
+     	    </activation>
+			<properties>
+				<muleagent.uri>http://172.20.85.197:9999</muleagent.uri>
+			</properties>
+		</profile>
+		<profile>
+			<id>UAT</id>
+			<activation>
+       			<property>
+          			<name>env</name>
+          			<value>uat</value>
+        		</property>
+     	    </activation>
+			<properties>
+				<muleagent.uri>http://172.20.85.236:9999</muleagent.uri>
+			</properties>
+		</profile>
+		<profile>
+			<id>PROD</id>
+			<activation>
+       			<property>
+          			<name>env</name>
+          			<value>prod</value>
+        		</property>
+     	    </activation>
+			<properties>
+				<muleagent.uri>http://prodserver:9999</muleagent.uri>
+			</properties>
+		</profile>
+		
+	</profiles>
+	
+	
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>${maven-compiler-plugin-version}</version>
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+				</configuration>
+			</plugin>
+			<plugin>
+           		<groupId>org.codehaus.mojo</groupId>
+            	<artifactId>exec-maven-plugin</artifactId>
+            	<version>1.2.1</version>
+            	<configuration>
+                	<mainClass>com.redn.connect.jenkins.MuleAgentConnect</mainClass>
+                 	<arguments>
+                 		<argument>${operationType}</argument>
+                 		<argument>${muleagent.uri}</argument>
+                 		<argument>${applicationName}</argument>
+                 		<argument>${waitTimeInSecs}</argument>
+                 		<argument>${noOfRetries}</argument>
+                 	</arguments>
+            	</configuration>
+        	</plugin>
+		</plugins>
+	</build>
+	
+	<dependencies>
+	<dependency>
+		<groupId>com.fasterxml.jackson.core</groupId>
+		<artifactId>jackson-core</artifactId>
+		<version>2.4.3</version>
+	</dependency>
+	<dependency>
+		<groupId>org.codehaus.jackson</groupId>
+		<artifactId>jackson-mapper-asl</artifactId>
+		<version>1.9.11</version>
+	</dependency>
+	<dependency>
+		<groupId>com.fasterxml.jackson.core</groupId>
+		<artifactId>jackson-databind</artifactId>
+		<version>2.4.3</version>
+	</dependency>
+</dependencies>
+</project>

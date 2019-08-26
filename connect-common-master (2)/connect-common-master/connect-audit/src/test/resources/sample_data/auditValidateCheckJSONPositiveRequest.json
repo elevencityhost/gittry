@@ -1,0 +1,22 @@
+{
+	"validationPutRequest":
+		{
+			"interface_id":"CA011",
+			"job_id":"TestCaseEntryvalidate",
+			"system_id":"2000",
+			"prop_name":["DEF_CRDT_AMOUNT"]
+		}
+}
+
+
+http://localhost:9090/cnaudit/validate
+Method: PUT
+{
+	"validationPutRequest":
+				{
+			"interface_id":"LEN001",
+			"job_id":"TestCaseEntrytest",
+			"system_id":"2000",
+			"prop_name":["NUM_OF_ITEMS"]
+		}
+}

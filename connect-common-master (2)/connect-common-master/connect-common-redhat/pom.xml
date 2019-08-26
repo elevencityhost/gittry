@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.redn.connect</groupId>
+	<artifactId>connect-common-redhat</artifactId>
+	<packaging>jar</packaging>
+	<version>1.0</version>
+
+	<properties>
+		<connect-common-pojo.version>1.2</connect-common-pojo.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.redn.connect</groupId>
+			<artifactId>connect-common-pojo</artifactId>
+			<version>${connect-common-pojo.version}</version>
+		</dependency>
+	</dependencies>
+
+</project>

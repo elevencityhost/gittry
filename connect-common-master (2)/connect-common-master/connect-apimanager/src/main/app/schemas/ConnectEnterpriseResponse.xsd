@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns="http://schemas.connect.com/enterprise/services/2014/05" elementFormDefault="qualified" targetNamespace="http://schemas.connect.com/enterprise/services/2014/05" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+<xs:element xmlns:q1="http://schemas.connect.com/enterprise/services/2014/05" name="ConnectEnterpriseResponse" nillable="true" type="q1:ConnectEnterpriseResponse" />
+<xs:complexType name="ConnectEnterpriseResponse">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="ResponseHeader" type="ResponseHeader"/>
+      <xs:element minOccurs="0" maxOccurs="1" name="ResponseBody" >
+        <xs:complexType>
+          <xs:sequence>
+            <xs:any processContents="skip"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ResponseHeader">
+    <xs:sequence>
+      <xs:element minOccurs="1" maxOccurs="1" name="ResponseId" type="xs:string" />
+      <xs:element minOccurs="1" maxOccurs="1" name="RequestId" type="xs:string" nillable="true" />
+      <xs:element minOccurs="1" maxOccurs="1" name="ThreadId"  type="xs:string" />
+      <xs:element minOccurs="0" maxOccurs="1" name="CreatedUtc" type="xs:dateTime" />
+      <xs:element minOccurs="1" maxOccurs="1" name="State" type="xs:string" />
+      <xs:element minOccurs="1" maxOccurs="1" name="Status" type="xs:string" />
+      <xs:element minOccurs="1" maxOccurs="1" name="Description" type="xs:string" />
+      <xs:element minOccurs="0" maxOccurs="1" name="Exception">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element minOccurs="1" maxOccurs="1" name="Any" type="xs:anySimpleType"/>
+          </xs:sequence>
+        </xs:complexType>
+		</xs:element>
+      </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ResponseBody">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="1" name="Any">
+     </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

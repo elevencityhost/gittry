@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-archive-logger" doc:name="Connectlogger: Configuration"/>
+    <jms:activemq-connector name="Active_MQ" username="${connect.nonretryqueue.activemq.user}" password="${connect.nonretryqueue.activemq.password}" brokerURL="${connect.nonretryqueue.activemq.url}" validateConnections="true" doc:name="Active MQ" acknowledgementMode="DUPS_OK_ACKNOWLEDGE" numberOfConsumers="${connect.nonretryqueue.activemq.consumers}" persistentDelivery="true">
+        <reconnect-forever frequency="${connect.nonretryqueue.activemq.reconnect.frequency}"/>
+    </jms:activemq-connector>
+    <file:connector name="File" autoDelete="false" streaming="true" validateConnections="true" doc:name="File"/>
+    <flow name="connect-archiving-QueueFlow">
+        <jms:inbound-endpoint queue="${connect.nonretryqueue.inbound.queue}" connector-ref="Active_MQ" doc:name="JMS"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="::::::::::::::::::::::::::::: #[message] :::::::::::::::::::::::::::::" processState="00000" doc:name="Connectlogger"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Payload is an instance of CEM" processState="123" doc:name="Connectlogger"/>
+                <choice doc:name="Choice">
+                    <when expression="#[payload.getEnterpriseHeader().getMessageId() != null]">
+                        <set-variable variableName="MessageID" value="#[payload.getEnterpriseHeader().getMessageId()]-MessageID" doc:name="Variable"/>
+                    </when>
+                    <otherwise>
+                        <set-variable variableName="MessageID" value="#[java.util.UUID.randomUUID()]-uuid" doc:name="Variable"/>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <set-variable variableName="MessageID" value="#[message.rootId]-RootID" doc:name="Variable"/>
+            </otherwise>
+        </choice>
+        <!-- <jms:inbound-endpoint queue="consumer.null.null.queue" connector-ref="Active_MQ" doc:name="JMS">
+            <jms:transaction action="NONE"/>
+        </jms:inbound-endpoint> -->
+        <mulexml:object-to-xml-transformer doc:name="Object to XML"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="The messageId is : #[flowVars.MessageID]" processState="hsjewgliuc" doc:name="Connectlogger"/>
+        <file:outbound-endpoint path="${connect.nonretryqueue.archive.location}" outputPattern="#[flowVars.MessageID].xml" connector-ref="File" responseTimeout="10000" doc:name="File"/>
+        <exception-strategy ref="common-global-exceptionhandlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+</mule>

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+	<choice-exception-strategy name="ConnectNotifier_Exception_Strategy">
+
+		<catch-exception-strategy doc:name="filterUnAcceptedExceptionStrategy"
+			when="#[exception.causedBy(org.mule.api.routing.filter.FilterUnacceptedException)]">
+			<flow-ref name="subHandleFilterUnAcceptedflow" doc:name="subHandleFilterUnAcceptedflow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(com.redn.connect.exception.ConnectException)]"
+			doc:name="connectExceptionCatchExceptionStrategy">
+			<flow-ref name="subHandleConnectExceptionFlow" doc:name="subHandleConnectExceptionFlow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(org.mule.api.transformer.TransformerException)]"
+			doc:name="subTransformationExceptionStrategy">
+			<flow-ref name="subTransformationExceptionflow" doc:name="subTransformationExceptionflow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(javax.jms.JMSException)]" doc:name="JMSException">
+			<flow-ref name="subJMSExceptionflow" doc:name="subJMSExceptionflow"
+				doc:description="Refers to common error handling sub-flow" />
+		</catch-exception-strategy>
+
+
+		<catch-exception-strategy doc:name="anyOtherExceptionCatchExceptionStrategy">
+			<flow-ref name="subHandleOtherExceptionflow" doc:name="subHandleOtherExceptionflow" />
+		</catch-exception-strategy>
+
+
+	</choice-exception-strategy>
+
+	<sub-flow name="subHandleConnectExceptionFlow">
+		<expression-component doc:name="Set Exception details"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=exception.getCauseException().getCode();
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=exception.getCauseException().getCategory();
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=exception.getCauseException().getOrigin();]]></expression-component>
+        <async doc:name="Async">
+            <flow-ref name="subPrepareEEandSendToCEHflow_2" doc:name="subPrepareEEandSendToCEHflow_2"/>
+        </async>
+
+		<flow-ref name="subflow-prepare-exception-response" doc:name="subflow-prepare-exception-response" />
+	</sub-flow>
+	<sub-flow name="subJMSExceptionflow">
+		<expression-component doc:name="Set Exception details"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=NotifierConstants.ERROR_CODE_JMS;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_ACTIVEMQ;]]></expression-component>
+        <async doc:name="Async">
+            <flow-ref name="subPrepareEEandSendToCEHflow_2" doc:name="subPrepareEEandSendToCEHflow_2"/>
+        </async>
+
+		<flow-ref name="subflow-prepare-exception-response" doc:name="subflow-prepare-exception-response" />
+	</sub-flow>
+
+	<sub-flow name="subHandleOtherExceptionflow">
+		<expression-component doc:name="Set Exception details"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=NotifierConstants.ERROR_CODE_OTHER;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]></expression-component>
+        <async doc:name="Async">
+            <flow-ref name="subPrepareEEandSendToCEHflow_2" doc:name="subPrepareEEandSendToCEHflow_2"/>
+        </async>
+
+		<flow-ref name="subflow-prepare-exception-response" doc:name="subflow-prepare-exception-response" />
+	</sub-flow>
+
+	<sub-flow name="subHandleFilterUnAcceptedflow">
+		<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=NotifierConstants.ERROR_CODE_FILTER_UNACCEPTED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=ConnectConstants.CONST_MESSAGE_ENTERPRISE_MESSAGE_VALIDATION_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]>
+		</expression-component>
+        <async doc:name="Async">
+            <flow-ref name="subPrepareEEandSendToCEHflow_2" doc:name="subPrepareEEandSendToCEHflow_2" doc:description="invoke handle error flow"/>
+        </async>
+
+		<flow-ref name="subflow-prepare-exception-response" doc:name="subflow-prepare-exception-response" />
+	</sub-flow>
+	<sub-flow name="subTransformationExceptionflow">
+		<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=NotifierConstants.ERROR_CODE_INVALID_JSON_DATA_RECEIVED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=NotifierConstants.ERROR_CODE_INVALID_JSON_DATA_RECEIVED_DESC;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]>
+		</expression-component>
+        <async doc:name="Async">
+            <flow-ref name="subPrepareEEandSendToCEHflow_2" doc:name="subPrepareEEandSendToCEHflow_2" doc:description="invoke handle error flow"/>
+        </async>
+
+		<flow-ref name="subflow-prepare-exception-response" doc:name="subflow-prepare-exception-response" />
+	</sub-flow>
+
+	<sub-flow name="subflow-prepare-exception-response">
+		<expression-component doc:name="Prepare Exception Response"><![CDATA[import com.redn.connect.notifications.response.NotificationMessageResponse;
+import com.redn.connect.notifications.response.EmailMessageResponse;
+import com.redn.connect.notifications.response.SMSMessageResponse;
+import com.redn.connect.constants.NotifierConstants;
+import com.redn.connect.notifications.request.CommonAttributesMessage;
+
+
+ responseObj = new NotificationMessageResponse();
+ commonAttributesMessage = new CommonAttributesMessage();
+ commonAttributesMessage.setRequestID(NotifierConstants.VAR_EMPTY);
+ commonAttributesMessage.setApplicationID(NotifierConstants.VAR_EMPTY);
+
+ responseObj.setCommonAttributesMessage(commonAttributesMessage);
+ 
+ 
+ emailMessageResponseObj = new  EmailMessageResponse();
+ emailMessageResponseObj.setResponseCode(flowVars[ConnectConstants.VAR_ERROR_CODE]);
+ emailMessageResponseObj.setResponseDescription(flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]);
+ emailMessageResponseObj.setStatus(NotifierConstants.VAR_STATUS_FAILURE);
+
+ smsMessageResponseObj =  new  SMSMessageResponse();
+ smsMessageResponseObj.setResponseCode(flowVars[ConnectConstants.VAR_ERROR_CODE]);
+ smsMessageResponseObj.setResponseDescription(flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]);
+ smsMessageResponseObj.setStatus(NotifierConstants.VAR_STATUS_FAILURE);
+ smsMessageResponseObj.setMessageIDs(NotifierConstants.VAR_EMPTY);
+
+ responseObj.setEmailMessageResponse(emailMessageResponseObj);
+ responseObj.setSmsMessageResponse(smsMessageResponseObj);
+
+payload = responseObj;]]></expression-component>
+		<json:object-to-json-transformer
+			doc:name="Object to JSON" />
+	</sub-flow>
+</mule>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="connect-notifier-logger" doc:name="Connectlogger: Configuration" />
+	<flow name="email-serviceFlow">
+
+		<jms:inbound-endpoint
+			queue="${connect.emailservice.activemq.emailservice.queuename}"
+			connector-ref="Active_MQ" doc:name="JMS - Email Service Queue">
+			<set-variable variableName="MULE_REPLYTO_STOP" value="true"
+				doc:name="Variable" />
+		</jms:inbound-endpoint>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="::: Received Payload From Notifier Service ::: #[payload]"
+			processState="102019110" doc:name="Connectlogger - Log Email Message" />
+		<choice doc:name="Check Payload Type">
+			<when
+				expression="#[payload instanceof java.lang.String  &amp;&amp;  null != payload]">
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					logMessage="Received java.lang.String  As Payload Converting To CEM Object"
+					processState="102019120" doc:name="Connectlogger-Log" />
+				<set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]"
+					doc:name="Set CEM Object As Payload" />
+			</when>
+			<otherwise>
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					logMessage="Received payload is not an instance of string"
+					processState="102019120" doc:name="Connectlogger" />
+			</otherwise>
+		</choice>
+		<message-filter throwOnUnaccepted="true" doc:name="Message">
+			<expression-filter
+				expression="#[payload !=null &amp;&amp; payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]" />
+		</message-filter>
+		<expression-component doc:name="Expression - Set Properties"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-emailservice");
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;
+]]></expression-component>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Email Sending Process Started" processState="102019130"
+			doc:name="Connectlogger - Log Email Sending Process Started" />
+		<enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]"
+				processState="102019960" doc:name="Connectlogger - Log CEM" />
+		</enricher>
+		<set-payload
+			value="#[new com.redn.connect.util.ConnectUtils().getPayloadTextContentFromCEM(payload)]"
+			doc:name="Set Email Message As Payload" />
+		<json:json-to-object-transformer
+			returnClass="com.redn.connect.notifications.request.EmailMessage"
+			doc:name="JSON to Object" />
+		<flow-ref name="connect-email-service-send-email-Flow"
+			doc:name="connect-email-service-send-email-Flow" />
+		<exception-strategy ref="emailserviceExceptionStrategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+	<flow name="connect-email-service-send-email-Flow">
+		<component doc:name="Java - Send Email">
+			<spring-object bean="emailSenderBean" />
+		</component>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Completed Email Service Flow Successfully" processState="102019140"
+			doc:name="Connectlogger - Log Email Sent Successfully" />
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+			<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=EmailServiceConstants.ERROR_CODE_SMTP_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=EmailServiceConstants.EXCEPTION_ORIGIN_REDINGTON_GULF;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;]]>
+			</expression-component>
+			<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" />
+		</catch-exception-strategy>
+	</flow>
+</mule>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    
+    <choice-exception-strategy name="common-global-exceptionhandlerChoice_Exception_Strategy">
+
+        <catch-exception-strategy doc:name="Other _Exception handler sub flow ">
+            <flow-ref name="Other-exception-handlerSub_Flow" doc:name="Other-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+
+    
+    <sub-flow name="Other-exception-handlerSub_Flow">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Exception has occured during archiving of the non retryable queues" processState="Non retryable state" doc:name="Connectlogger"/>
+
+    </sub-flow>
+
+</mule>

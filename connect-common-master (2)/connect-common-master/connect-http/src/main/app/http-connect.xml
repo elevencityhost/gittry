@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+
+	<!-- <context:property-placeholder location="connect_config_httpconnect.properties"/> -->
+
+	<file:connector name="File_Archive_Request_Response"
+		outputPattern="#[flowVars.serviceName]-#[message.id]-#[ConnectUtils.getCurrentTimeAsString()].xml"
+		autoDelete="true" streaming="true" validateConnections="true"
+		doc:name="File" />
+
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="connect-logger-http" doc:name="Connectlogger: Configuration" />
+
+	<flow name="http-connectFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration"
+			path="${input.http.path}" doc:name="HTTP" doc:description="Http endpoint is triggered" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage=":: Received message for connect-http ::" processState="102001100"
+			doc:name="Connectlogger" />
+		<set-variable variableName="#[HTTPConnectConstants.MESSAGE_ID]"
+			value="#[message.id]" doc:name="Set-messageId" doc:description="Sets the messageId " />
+        <logger level="INFO" doc:name="Logger"/>
+
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage=":: connect-http message processing started ::"
+			processState="102001101" doc:name="Connectlogger" />
+
+        <choice doc:name="Check For Source Attribute">
+        	<when expression="#[message.inboundProperties.'http.query.params'.source != null &amp;&amp; null !=payload ]">
+        		<set-variable variableName="source" value="#[message.inboundProperties.'http.query.params'.source]" doc:name="set source for Synchronous Request" doc:description="Sets the source for the ATP"/>
+                <flow-ref name="http-connectSub_Flow" doc:name="http-connectSub_Flow"/>
+        	</when>
+            <when expression="#[message.inboundProperties.source != null &amp;&amp; null != payload ]">
+                <set-variable variableName="source" value="#[message.inboundProperties['source']]" doc:name="set source for Synchronous Request"/>
+                <flow-ref name="http-connectSub_Flow" doc:name="http-connectSub_Flow"/>
+            </when>
+            <otherwise>
+                <set-property propertyName="http.status" value="200" doc:name="Property"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="message.inboundProperties.'http.query.params'.source value is null" processState="102001110" doc:name="Connectlogger"/>
+            </otherwise>
+
+        </choice>
+
+		<exception-strategy ref="Choice_Exception_Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+    <sub-flow name="http-connectSub_Flow">
+        <set-variable variableName="relativePath" value="#[message.inboundProperties['http.relative.path']]" doc:name="set relative path" doc:description="Sets the realtive path"/>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Before SetSenderPath #[message]" processState="102001110" doc:name="Connectlogger"/>
+        <set-variable variableName="senderPath" value="#[message.inboundProperties['http.relative.path']]" doc:name="set sender path"/>
+        <flow-ref name="get-externalprops-and-createCEM" doc:name="get-externalprops-and-createCEM"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: connect-http message processing completed successfully and CEM is dispatched from Connect-Http ::" processState="102001150" doc:name="Connectlogger"/>
+    </sub-flow>
+
+
+	<sub-flow name="get-externalprops-and-createCEM">
+		<component class="com.redn.connect.transformer.GetExternalProperties"
+			doc:name="get-external-props" doc:description="Java class to get the external properties" />
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+        <flow-ref name="ArchivingRequest" doc:name="ArchivingRequest"/>
+		<custom-transformer
+			class="com.redn.connect.transformer.CreateConnectEnterpriseMessage"
+						doc:name="create-connect-enterprise-message" doc:description="Java class to create connect enterprise message" />
+				<enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+					<connectlogger:info config-ref="Connectlogger__Configuration"
+						logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]"
+						processState="102001960" doc:name="Connectlogger-LogCEM" />
+				</enricher>
+		<set-property propertyName="source" value="#[flowVars.source]"
+			doc:name="Set SyncRequest Source Property" doc:description="Sets the source ATP" />
+		<set-property propertyName="relativePath" value="#[flowVars.relativePath]"
+			doc:name="set relativepath property" doc:description="Sets the relativepath property" />
+		<http:request config-ref="HTTP_Request_Configuration"
+			path="${apimanager.http.path}" method="POST" doc:name="call-apimanager"
+			doc:description="Makes a call to the APImanger component" />
+		<logger message="#[message],#[message.payloadAs(java.lang.String)]"
+			level="INFO" doc:name="response from API Manager" />
+		<choice doc:name="Check Communication Type" doc:description="Check for Synchronous Request">
+			<when expression="#[flowVars.communicationType=='Sync']">
+				<byte-array-to-string-transformer
+					mimeType="text/xml" doc:name="Byte Array to String" />
+				<logger message="#[payload]" level="INFO" doc:name="Log Payload" />
+				<component class="com.redn.connect.transformer.ModifyResponsePayload"
+					doc:name="Modify Response Payload" doc:description="Java class to Modify Response Payload" />
+				<set-variable value="" variableName="temp" doc:name="Temp var"></set-variable>
+				<enricher doc:name="Message Enricher" target="#[flowVars.temp]">
+					<flow-ref name="ArchivingResponse" doc:name="ArchivingResponse" />
+				</enricher>
+			</when>
+			<otherwise>
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					doc:name="Connectlogger" logMessage="Response sent to REST service"
+					processState="102001140" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+
+	<sub-flow name="ArchivingRequest">
+		<component class="com.redn.connect.transformer.AddProperties"
+			doc:name="Java" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="File Archive Location ========= #[flowVars.fileArchiveLocationForRequest]"
+			processState="102001150" doc:name="Connectlogger" />
+        <logger message="Before Request Archiving #[message]" level="INFO" doc:name="Logger"/>
+		<file:outbound-endpoint path="#[flowVars.fileArchiveLocationForRequest]"
+			responseTimeout="10000" doc:name="File_Request_Archiving"
+			connector-ref="File_Archive_Request_Response" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Http Request is Archived" processState="102001140"
+			doc:name="Connectlogger" />
+	</sub-flow>
+	<sub-flow name="ArchivingResponse">
+	
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" mimeType="text/xml" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="#[flowVars.fileArchiveLocationForResponse]" processState="102001170"
+			doc:name="Connectlogger" />
+        <logger message="Before Response Archiving #[message]" level="INFO" doc:name="Logger"/>
+		<file:outbound-endpoint path="#[flowVars.fileArchiveLocationForResponse]"
+			responseTimeout="10000" doc:name="File_Response_Archiving"
+			connector-ref="File_Archive_Request_Response" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Http Response is Archived" processState="102001160"
+			doc:name="Connectlogger" />
+	</sub-flow>
+</mule>

@@ -1,0 +1,20 @@
+{
+	"type":"object",
+	"$schema": "http://json-schema.org/draft-03/schema",
+	"id": "http://jsonschema.net",
+	"required":false,
+	"properties":{
+		"outputCounterResponse": {
+			"type":"object",
+			"id": "http://jsonschema.net/outputCounterResponse",
+			"required":true,
+			"properties":{
+				"output_count": {
+					"type":"string",
+					"id": "http://jsonschema.net/outputCounterResponse/output_count",
+					"required":true
+				}
+			}
+		}
+	}
+}

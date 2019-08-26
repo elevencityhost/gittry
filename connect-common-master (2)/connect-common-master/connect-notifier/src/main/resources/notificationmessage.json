@@ -1,0 +1,18 @@
+{
+	"emailMessage":{
+		"applicationID":"applicationID",
+	    "requestID":"SAIPRASAD1234",
+	    "toList":["one@gmail.com","two@gmail.com","three@gmail.com"],
+	    "ccList":["one@gmail.com","two@gmail.com","three@gmail.com"],
+	    "bccList":["one@gmail.com","two@gmail.com","three@gmail.com"],
+	    "replyTo":"replyTo@gmail.com",
+        "subject":"Notification Message Email Subject",
+	    "body":"",
+		"templateID":"templateIDvalue",
+		"keyValuePairs":{
+        	"keyname1":"value1",
+        	"keyname2":"value2"
+        },
+        "attachments":["attachmentpath1","attachmentpath2","attachmentpath3"]
+	}
+}

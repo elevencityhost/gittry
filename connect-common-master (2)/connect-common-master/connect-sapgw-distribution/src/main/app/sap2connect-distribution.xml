@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:sap="http://www.mulesoft.org/schema/mule/sap" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	
+	
+	<flow name="sap2connect-distributionsFlow">
+              
+        <sap:inbound-endpoint connector-ref="SAPDistributionsConn" type="idoc" rfcType="trfc" outputXml="true" jcoGwHost="${connect.sapgw.sapinstance.distribution.host}" jcoGwService="${connect.sapgw.sapinstance.distribution.service}" jcoProgramId="${connect.sapgw.sapinstance.distribution.programId}" responseTimeout="10000" doc:name="SAP distributor GM 1 receiver"/>
+
+		<connectlogger:info config-ref="ConnectloggerConn"
+			logMessage=":: Received message for sap2connect distribution GM1  idoc ::"
+			processState="102017100" doc:name="Connectlogger" />
+        <flow-ref name="Sub_Sap2Connect-Distribution-Send-MainIdocReceive" doc:name="Sub_Sap2Connect-Distribution-Send-MainIdocReceive"/>
+
+        <exception-strategy ref="global-exception-handlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+	</flow>
+    <sub-flow name="Sub_Sap2Connect-Distribution-Send-MainIdocReceive">
+        <sap:object-to-xml doc:name="SAP Object to XML"/>
+        <jms:outbound-endpoint queue="${connect.sap2connect.common.receiver.queue}" connector-ref="Sap2connectActiveMQConn" doc:name="send idoc to mainIdocReciveFlow"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: Successfully sent idoc to sap2connect common queue ::" processState="102017110" doc:name="Connectlogger"/>
+    </sub-flow>
+    <flow name="sap2connect-distribution-from-GM2-Instance-Flow">
+        <sap:inbound-endpoint connector-ref="SAPDistributionsConnGM2" type="idoc" rfcType="trfc" outputXml="true" jcoGwHost="${connect.sapgw.sapinstance.distribution.gm2.host}" jcoGwService="${connect.sapgw.sapinstance.distribution.gm2.service}" jcoProgramId="${connect.sapgw.sapinstance.distribution.gm2.programId}" responseTimeout="10000" doc:name="SAP distributor GM2 receiver"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: Received message for sap2connect GM 2 distribution idoc ::" processState="102017105" doc:name="Connectlogger"/>
+        <flow-ref name="Sub_Sap2Connect-Distribution-Send-MainIdocReceive" doc:name="Sub_Sap2Connect-Distribution-Send-MainIdocReceive"/>
+        <exception-strategy ref="global-exception-handlerChoice_Exception_Strategy" doc:name="Copy_of_Reference Exception Strategy"/>
+    </flow>
+</mule>

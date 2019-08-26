@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+	<http:listener-config name="HTTP_Listener_Configuration"
+		host="0.0.0.0" port="${connect.internal.http.port}" doc:name="HTTP Listener Configuration" />
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="Connect_Internal_HTTP_Logger" doc:name="Connectlogger: Configuration" />
+
+	<http:request-config name="HTTP_Request_Configuration"
+		host="${connect.internal.http.apimanager.host}" port="${connect.internal.http.apimanager.port}"
+		doc:name="HTTP Request Configuration" />
+	<flow name="connect-internal-httpFlow" doc:description="This flow has the logic to receive inbound attachments or payload content through HTTP endpoint.">
+		<http:listener config-ref="HTTP_Listener_Configuration"
+			path="${connect.internal.http.path}"  doc:name="HTTP" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage=":::::: Received message for connect-internal-http :::::: #[message]"
+			processState="102018110" doc:name="Connectlogger - Received Request" />
+        <choice doc:name="Check For Source Query Param">
+            <when expression="#[message.inboundProperties.'http.query.params'.source != null]">
+                <set-property propertyName="source" value="#[message.inboundProperties.'http.query.params'.source]" doc:name="Property - Set Notification Property"/>
+                <flow-ref name="connect-internal-httpSub_Flow" doc:name="connect-internal-httpSub_Flow"/>
+            </when>
+            <otherwise>
+                <connectlogger:error config-ref="Connectlogger__Configuration" logMessage="HTTP Query Param With Name 'source' Not Available As Part Of Requested URL" processState="102018170" doc:name="Connectlogger - Log Source Property Not Found As Part Of URL"/>
+            </otherwise>
+        </choice>
+
+		<exception-strategy ref="connectInternalHTTP_ExceptionStrategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+    <sub-flow name="connect-internal-httpSub_Flow">
+        <message-filter throwOnUnaccepted="true" doc:name="Message check InboundAttachments or payload Filter">
+            <expression-filter expression="#[!message.inboundAttachments.keySet().isEmpty() || message.payload !=null]"/>
+        </message-filter>
+        <flow-ref name="connect-internal-httpSub_Flow-ConvertParameterMapToJSON" doc:name="connect-internal-httpSub_Flow-ConvertParameterMapToJSON"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received message consists of inboundAttachments with keys ===  #[message.inboundAttachments.keySet()] === And Payload is ==== #[payload]" processState="102018120" doc:name="Connectlogger - Received Attachment Key Names or Payload Content"/>
+        <component class="com.redn.connect.proccessor.ArchiveReceivedPayload" doc:name="Java - Archive Received Payload Content"/>
+        <foreach collection="#[message.inboundAttachments]" doc:name="For Each - InboundAttachments" doc:description="Based on the received inbound attachments loop will extract filenames and copy them to CEM under custom properties later.">
+            <message-filter doc:name="Message - Filter Non Attachments">
+                <expression-filter expression="#[payload.dataSource.part.fileName != null]"/>
+            </message-filter>
+            <flow-ref name="connect-internal-archive_request_flow" doc:name="connect-internal-archive_request_flow"/>
+            <set-variable variableName="stagedFileNameAndLocation" value="#[ConnectUtils.getCurrentTimeAsString()]_#[payload.dataSource.part.fileName]" doc:name="Variable - Staged File Name and Location"/>
+            <set-variable variableName="#[InternalHTTPConstants.VAR_ATTACHMENT_NAMES]" value="#[flowVars[InternalHTTPConstants.VAR_ATTACHMENT_NAMES] == null ?flowVars.stagedFileNameAndLocation:flowVars[InternalHTTPConstants.VAR_ATTACHMENT_NAMES]+','+flowVars.stagedFileNameAndLocation]" doc:name="Variable - Attachment Names"/>
+            <file:outbound-endpoint path="${connect.internal.http.write.processing.location}" outputPattern="#[flowVars.stagedFileNameAndLocation]" responseTimeout="10000" doc:name="File - Write Attachments For Processing"/>
+        </foreach>
+        <set-variable variableName="#[InternalHTTPConstants.VAR_FILE_PROCESSING_LOCATION]" value="${connect.internal.http.write.processing.location}" doc:name="Variable - FileProcessing Location"/>
+        <component class="com.redn.connect.proccessor.CreateCEMAndAppendPayload" doc:name="Java - Create CEM "/>
+        <expression-component doc:name="Expression - Set Flowvars For Logger Functionality"><![CDATA[flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+payload.getEnterpriseHeader().setComponent(InternalHTTPConstants.COMPONENT_NAME_CONSTANT);
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;]]></expression-component>
+        <set-property propertyName="relativePath" value="#[message.inboundProperties['http.relative.path']]" doc:name="Property - Set Relative Path Property"/>
+        <enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102018960" doc:name="Connectlogger-LogCEM"/>
+        </enricher>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="::: Processing Of Connect Internal HTTP Completed Payload Transfered To API Manager :::" processState="102018150" doc:name="Connectlogger - Completed Connect Internal HTTP"/>
+        <http:request config-ref="HTTP_Request_Configuration" path="${connect.internal.http.apimanager.path}" method="POST" doc:name="HTTP - Call API Manager"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <async doc:name="Async">
+            <flow-ref name="connect-internal-archive_response_flow" doc:name="connect-internal-archive_response_flow"/>
+        </async>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="CEM Sent To API Manager For Processing" processState="102018160" doc:name="Connectlogger - Log CEM Sent To API Manager"/>
+    </sub-flow>
+
+	<sub-flow name="connect-internal-httpSub_Flow-ConvertParameterMapToJSON" doc:description="This flow will convert the received parametermap instance to JSON structure.">
+		<choice doc:name="Choice - Route By Payload Instance Type">
+			<when
+				expression="#[payload instanceof org.mule.module.http.internal.ParameterMap]">
+				<json:object-to-json-transformer
+					doc:name="Object to JSON" />
+			</when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Recevied Payload is not an instance of  ParameterMap" processState="102018170" doc:name="Connectlogger - Log Received Instance"/>
+            </otherwise>
+		</choice>
+
+	</sub-flow>
+	<sub-flow name="connect-internal-archive_request_flow" doc:description="This flow is for archiving the received files.">
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Archiving Received Attachment With Name === #[payload.dataSource.part.fileName]"
+			processState="102018130" doc:name="Connectlogger - Log Attachment Names Received" />
+		<file:outbound-endpoint
+			path="${connect.internal.http.write.archiving.location}"
+			 responseTimeout="10000"
+			doc:name="File - Archive Received Attachments" outputPattern="connect-internal-http-#[message.id]-#[ConnectUtils.getCurrentTimeAsString()]-#[payload.dataSource.part.fileName]"/>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Archived Received Attachment === #[payload.dataSource.part.fileName]"
+			processState="102018140" doc:name="Connectlogger - Log Attachment Names Archived" />
+	</sub-flow>
+	
+	<sub-flow name="connect-internal-archive_response_flow" doc:description="This flow is for archiving the received response files.">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Archiving Response Received !!!" processState="102018170" doc:name="Connectlogger - Archiving Response"/>
+		<file:outbound-endpoint
+			path="${connect.internal.http.write.response.archiving.location}"
+			 responseTimeout="10000"
+			doc:name="File - Archive Received Response" outputPattern="connect-internal-http-#[message.id]-#[ConnectUtils.getCurrentTimeAsString()].txt"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Response Archived Successfully !!!" processState="102018170" doc:name="Connectlogger - Log Response Archived Successfully"/>
+	</sub-flow>
+</mule>

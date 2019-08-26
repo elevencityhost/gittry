@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:sap="http://www.mulesoft.org/schema/mule/sap" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+
+    <!--   <sap:connector name="SAP" jcoAsHost="${connect.sap2connect.sapinstance.host}" jcoUser="${connect.sap2connect.sapinstance.user}" jcoPasswd="${connect.sap2connect.sapinstance.password}" jcoSysnr="${connect.sap2connect.sapinstance.systemnumber}" jcoClient="${connect.sap2connect.sapinstance.systemnumber.client}" validateConnections="true" doc:name="SAP"/>      -->
+    <mulexml:jaxb-context name="JAXB_Context" packageNames="com.redn.connect.vo" doc:name="JAXB Context"/>
+
+    <file:connector name="File_Config" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-sap2connect-logger" doc:name="Connectlogger: Configuration"/>
+    <jms:activemq-connector name="sap2connectCommonActiveMQConn" username="${connect.sap2connect.common.activemq.user}" password="${connect.sap2connect.common.activemq.password}" brokerURL="${connect.sap2connect.common.activemq.url}" validateConnections="true" doc:name="Active MQ" persistentDelivery="true" specification="1.1" numberOfConsumers="${connect.sap2connect.activemq.consumers}" >
+        <reconnect-forever frequency="${connect.sap2connect.common.activemq.frequency}"/>
+        <service-overrides sessionHandler="org.mule.session.NullSessionHandler"/>
+    </jms:activemq-connector>
+    <db:mysql-config name="MySQL_Configuration" host="${connect.sap2connect.database.host}" port="${connect.sap2connect.database.port}" user="${connect.sap2connect.database.user}" password="${connect.sap2connect.database.password}" database="${connect.sap2connect.database.instance}" doc:name="MySQL Configuration"/> 
+   
+   
+    <flow name="mainIdocReciveFlow">
+        <jms:inbound-endpoint connector-ref="sap2connectCommonActiveMQConn" doc:name="JMS" queue="${connect.sap2connect.common.receiver.queue}"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Received message for sap2connect common ::" processState="102017100" doc:name="Connectlogger"/>
+
+         
+        <message-properties-transformer doc:name="Capture-Idoc-parameter">
+            <add-message-property key="IDOCTYP" value="#[xpath3('//IDOC/EDI_DC40/IDOCTYP')]"/>
+            <add-message-property key="DOCNUM" value="#[xpath3('//IDOC/EDI_DC40/DOCNUM')] "/>
+            <add-message-property key="MESTYP" value="#[xpath3('//IDOC/EDI_DC40/MESTYP')] "/>
+            <add-message-property key="CRETIM" value="#[xpath3('//IDOC/EDI_DC40/CRETIM')] "/>
+            <add-message-property key="CREDAT" value="#[xpath3('//IDOC/EDI_DC40/CREDAT')] "/>
+        </message-properties-transformer>
+        <set-variable variableName="basicTypeOfIDOC" value="#[xpath3('name(/*)')]" doc:name="basicTypeOfIDOC"/>
+        <set-variable variableName="CRETIM" value="#[xpath3('//IDOC/EDI_DC40/CRETIM')]" doc:name="CRETIM"/>
+        <set-session-variable variableName="DOCNUM" value="#[xpath3('//IDOC/EDI_DC40/DOCNUM')]" doc:name="DOCNUM"/>
+        <set-variable variableName="MESCOD" value="#[xpath3('//IDOC/EDI_DC40/MESCOD')]" doc:name="MESCOD"/>
+
+        <set-variable variableName="MESFCT" value="#[xpath3('//IDOC/EDI_DC40/MESFCT')]" doc:name="MESFCT"/>
+        <set-variable variableName="PAYRUNDT" value="#[xpath3('//IDOC/E1IDKU3/PAYRUNDT')]" doc:name="Variable - PEXR2002 / PAYRUNDT"/>
+
+        <component class="com.redn.connect.processor.AllocateEnterpriseMessageProperties" doc:name="Allocate-Enterprise-Message"/>
+        <flow-ref name="ArchiveReceivedIDOC" doc:name="ArchiveReceivedIDOC"/>
+        <enricher source="#[payload]" target="#[flowVars[statusOfInsert]]" doc:name="Message Enricher">
+            <flow-ref name="PersistGMInstanceInfo" doc:name="PersistGMInstanceInfo"/>
+        </enricher>
+        <flow-ref name="sap2gatewayconfigFlow" doc:name="sap2gatewayconfigFlow"/>
+        <exception-strategy ref="global-exception-handlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+
+
+    </flow>
+    <sub-flow name="ArchiveReceivedIDOC">
+                
+  <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Writing XML Content To File :: #[payload]" processState="102017110" doc:name="Connectlogger"/>
+
+
+                <file:outbound-endpoint path="#[sessionVars['fileArchiveLocation']]" connector-ref="File_Archive_Config" responseTimeout="10000" doc:name="Archive Received IDOC"/>
+    </sub-flow>
+    <flow name="PersistGMInstanceInfo" processingStrategy="synchronous">
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Inside flow PersistGMInstanceInfo To store GM instance , source and p.o number" processState="102017120" doc:name="Connectlogger"/>
+        <choice doc:name="CheckSource">
+            <when expression="#[flowVars.MESCOD!=null&amp;&amp;flowVars.MESCOD!=empty&amp;&amp;flowVars.MESCOD.toString().equalsIgnoreCase(&quot;HPI&quot;)]">
+               <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Source is HP. Store information in DB" processState="102017130" doc:name="Connectlogger"/>
+                <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="GmInstancePOR" value="#[xpath3('//IDOC/EDI_DC40/SNDPOR')]"/>
+                    <add-message-property key="poNumberForOrder" value="#[xpath3('//IDOC/E1EDK01/BELNR')]"/>
+                    <add-message-property key="GmInstancePRN" value="#[xpath3('//IDOC/EDI_DC40/SNDPRN')]"/>
+                </message-properties-transformer>
+                <set-variable variableName="gmInstanceName" value="#[flowVars.GmInstancePOR].#[flowVars.GmInstancePRN]" doc:name="Variable"/>
+                <component class="com.redn.connect.processor.utils.GmInstanceIdentifier" doc:name="Java"/>
+                <db:insert config-ref="MySQL_Configuration" doc:name="StoreGMDetails">
+                    <db:parameterized-query><![CDATA[insert into GMInstance(identifier,GMInstanceName,sourceSystem) value (
+#[flowVars.poNumberForOrder],
+#[flowVars.sapGmInstanceName],
+#[flowVars.MESCOD.toString().toUpperCase()]
+)]]></db:parameterized-query>
+                </db:insert>
+                <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Source is HP. Store information in DB" processState="102017130" doc:name="Connectlogger"/>
+            </when>
+            <when expression="#[flowVars.MESCOD==null || flowVars.MESCOD!=null&amp;&amp;flowVars.MESCOD.toString().trim()==empty]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Source Can not be empty or null....Throw Error" processState="102017140" doc:name="Connectlogger"/>
+            </when>
+            <otherwise>
+              <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Source is NOT HP.No Need to Store information in DB" processState="102017150" doc:name="Connectlogger"/>
+            </otherwise>
+        </choice>
+    </flow>
+   
+    
+</mule>

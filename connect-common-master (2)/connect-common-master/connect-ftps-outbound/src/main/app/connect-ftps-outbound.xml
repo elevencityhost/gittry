@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ftps="http://www.mulesoft.org/schema/mule/ftps"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ftps http://www.mulesoft.org/schema/mule/ftps/current/mule-ftps.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+	<ftps:config name="FTPS_Basic_Configuration" port="${connect.ftps.outbound.nbd.port}"
+		username="${connect.ftps.outbound.nbd.username}" password="${connect.ftps.outbound.nbd.password}"
+		keyStorePath="${connect.ftps.outbound.nbd.serverkeystore.path}"
+		keyStorePassword="${connect.ftps.outbound.nbd.serverkeystore.password}"
+		clientKeyStorePath="${connect.ftps.outbound.nbd.clientkeystore.path}"
+		clientKeyStorePassword="${connect.ftps.outbound.nbd.clientkeystore.password}" maxConcurrentReads="${connect.ftps.outbound.nbd.downloadthreads}"
+		doc:name="FTPS: Basic Configuration" host="${connect.ftps.outbound.nbd.host}"/>
+
+	<flow name="connect-ftps-outboundFlow">
+		<jms:inbound-endpoint queue="${connect.ftps.outbound.queuename}"
+			connector-ref="activeMQGlblConn" doc:name="JMS" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage=":: Received message for connect-ftps-outbound ::"
+			processState="102021100" doc:name="Connectlogger - Received Message" />
+		<choice doc:name="Choice - Route Message Based On Payload Instance">
+			<when expression="#[payload instanceof java.lang.String]">
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					doc:name="Connectlogger - Received Message Instance Of String"
+					logMessage="Received message is an instance of String"
+					processState="102021110" />
+				<set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]"
+					doc:name="Set Payload - Convert String As XML To CEM" />
+			</when>
+			<otherwise>
+				<connectlogger:info config-ref="Connectlogger__Configuration"
+					logMessage="Received message is not an instance of String"
+					processState="10202110" doc:name="Connectlogger - Received Message Instance Of CEM" />
+			</otherwise>
+		</choice>
+		<message-filter throwOnUnaccepted="true"
+			doc:name="Message - Check Payload As CEM Instance">
+			<expression-filter
+				expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]" />
+		</message-filter>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Received Instance Is Of Type CEM" processState="102021120"
+			doc:name="Connectlogger - CEM Instance" />
+		<expression-component doc:name="Expression - Set Common Properties"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-ftps-outbound");
+flowVars[ConnectConstants.ENTERPRISE_MESSAGE]= payload; 
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+]]></expression-component>
+		<enricher doc:name="Message Enricher" target="#[flowVars.CEMASXML]">
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]"
+				processState="102021960" doc:name="Connectlogger - Log CEM" />
+		</enricher>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Reading Of CEM Started" processState="102021130"
+			doc:name="Connectlogger - Read CEM Properties" />
+		<component doc:name="Java - Read CEM And Prepare FTPS Properties">
+			<spring-object bean="readCEMAndPrepareFTPSPropertiesName" />
+		</component>
+		<foreach collection="#[flowVars[FTPSOutboundConstants.LIST_OF_FILE_LOCATIONS]]"
+			doc:name="For Each - List Of Files">
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				logMessage="Inside For Each Flow ===  File Name To Process Is === #[payload]"
+				processState="102021140" doc:name="Connectlogger-Inside For Each" />
+            <set-variable variableName="#[FTPSOutboundConstants.VAR_ARCHIVING_FILE_NAME_Pattern]" value="connect-ftps-outbound-#[flowVars[ConnectConstants.VAR_MESSAGE_ID]]-#[ConnectUtils.getCurrentTimeAsString()].xml" doc:name="Variable - Archive File Name"/>
+			<component doc:name="Java - Prepare File Content To Stream Object">
+				<spring-object bean="prepareFileStreamObjectName" />
+			</component>
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Posting File To FTPS Started === Target Flow === #[flowVars[FTPSOutboundConstants.VAR_TARGET_SYSTEM_SEND_FLOW]]" processState="102021170" doc:name="Connectlogger - Posting File To FTPS Location Started"/>
+            <flow-ref name="#[flowVars[FTPSOutboundConstants.VAR_TARGET_SYSTEM_SEND_FLOW]]" doc:name="#[flowVars[FTPSOutboundConstants.VAR_TARGET_SYSTEM_SEND_FLOW]]"/>
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="FTPS flow completed" processState="102021200" doc:name="Connectlogger - ftps flow completed"/>
+		</foreach>
+
+		<exception-strategy ref="globalChoiceExceptionStrategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+   <!--  <sub-flow name="connect-ftps-archive-sub-flow">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Archiving flow started ===" processState="102021150" doc:name="Connectlogger - Archiving Flow Started"/>
+        <set-payload value="#[flowVars[FTPSOutboundConstants.VAR_STREAM_OBJECT]]" doc:name="Set Payload - StreamObject As Payload"/>
+        <file:outbound-endpoint path="${connect.ftps.outbound.archiving.location}" outputPattern="connect-ftps-outbound-#[message.id]-#[ConnectUtils.getCurrentTimeAsString()].xml" responseTimeout="10000" doc:name="File - Archiving "/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Archiving Flow Completed" processState="102021160" doc:name="Connectlogger - Archiving Flow Completed"/>
+    </sub-flow> -->
+</mule>

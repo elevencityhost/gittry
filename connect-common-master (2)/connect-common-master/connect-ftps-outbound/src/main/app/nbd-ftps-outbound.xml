@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:ftps="http://www.mulesoft.org/schema/mule/ftps" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/ftps http://www.mulesoft.org/schema/mule/ftps/current/mule-ftps.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<flow name="nbd-ftps-send-flow">
+			<ftps:write config-ref="FTPS_Basic_Configuration"
+				filePath="${connect.ftps.outbound.nbd.path}" doc:name="FTPS - Server"
+				payload-ref="#[flowVars[FTPSOutboundConstants.VAR_STREAM_OBJECT]]"
+				fileName="#[flowVars[FTPSOutboundConstants.VAR_FILE_NAME]]" />
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				logMessage="Posting File To FTPS Completed" processState="102021180"
+				doc:name="Connectlogger - Posting File To FTPS Completed" />
+			<expression-component doc:name="Expression - Close FIS"><![CDATA[#[flowVars[FTPSOutboundConstants.VAR_STREAM_OBJECT].close()]]]></expression-component>
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				logMessage="Closed FileInputStream Object Successfully"
+				processState="102021190" doc:name="Connectlogger - Completed Posted Of File To FTPS" />
+		<catch-exception-strategy doc:name="lenovo-send-Catch_Exception_Strategy"
+			doc:description="handles the exceptions in sending AS2 messages to Lenovo">
+
+			<expression-component doc:name="set exception properties"
+				doc:description="sets exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]= FTPSOutboundConstants.ERROR_CODE_FTPS_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=FTPSOutboundConstants.ERROR_CODE_FTPS_COMMUNICATION_ORIGIN;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;
+flowVars[FTPSOutboundConstants.VAR_STREAM_OBJECT].close();
+
+
+
+]]>
+			</expression-component>
+			<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow"
+				doc:description="calls the flow to prepare EE and send to CEH" />
+
+		</catch-exception-strategy>
+	</flow>
+
+</mule>
+
+
+
+
+
+
+

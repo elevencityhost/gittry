@@ -1,0 +1,218 @@
+
+**** Error file opened at 20161123 123603 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 12:36:03,855<    >RfcGetException rc (7) message: The initial password has expired (request a new one)
+<RfcGetException
+
+Error:  >Wed Nov 23 12:36:06,176<    >RfcGetException rc (7) message: The initial password has expired (request a new one)
+<RfcGetException
+
+
+**** Error file opened at 20161123 125436 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 12:54:36,835<    >RfcGetException rc (7) message: No RFC authorization for function module RFCPING.
+<RfcGetException
+
+Error:  >Wed Nov 23 12:54:39,010<    >RfcGetException rc (7) message: No RFC authorization for function module RFCPING.
+<RfcGetException
+
+
+**** Error file opened at 20161123 164528 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 16:45:28,777<    >RfcGetException rc (7) message: No RFC authorization for function module RFCPING.
+<RfcGetException
+
+Error:  >Wed Nov 23 16:45:31,019<    >RfcGetException rc (7) message: No RFC authorization for function module RFCPING.
+<RfcGetException
+
+
+**** Error file opened at 20161123 172201 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 17:22:01,618<    >RfcGetException rc (7) message: No RFC authorization for function module RFCPING.
+<RfcGetException
+
+Error:  >Wed Nov 23 17:22:03,881<    >RfcGetException rc (7) message: No RFC authorization for function module RFCPING.
+<RfcGetException
+
+
+**** Error file opened at 20161123 193914 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 19:39:14,714<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTDEV from host ??? not allowed
+TIME        Wed Nov 23 18:09:14 2016
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     6252
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+
+**** Error file opened at 20161123 194016 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 19:40:16,249<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTDEV from host ??? not allowed
+TIME        Wed Nov 23 18:10:16 2016
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     6270
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+
+**** Error file opened at 20161123 200952 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Wed Nov 23 20:09:52,141<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTDEV from host ??? not allowed
+TIME        Wed Nov 23 18:39:52 2016
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     6291
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+Error:  >Wed Nov 23 20:09:52,967<    
+>RfcIoException:
+    message: no message received
+    Return code: RFCIO_ERROR_SYSERROR(5)<
+
+
+Error: [2] >Wed Nov 23 20:09:52,967<    RfcException: [IBSHYDNB861|RFCCNCTDEV]
+    message: no message received
+    Return code: RFC_FAILURE(1)
+    error group: 102
+    key: RFC_ERROR_COMMUNICATION
+Exception raised by IBSHYDNB861|RFCCNCTDEV
+
+
+**** Error file opened at 20161128 184723 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Mon Nov 28 18:47:23,135<    RfcException: [null]
+    message: Connect to SAP gateway failed
+    Connection parameters: TPNAME=RFCCNCTDEV GWHOST=${sap2conect.instance.host} GWSERV=sapgw00
+
+ERROR       hostname '${sap2conect.instance.host}' unknown
+TIME        Mon Nov 28 18:47:23 2016
+RELEASE     721
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -2
+MODULE      ninti.c
+LINE        897
+DETAIL      NiPGetHostByName: '${sap2conect.instance.host}' not found
+SYSTEM CALL getaddrinfo
+COUNTER     1
+
+    Return code: RFC_FAILURE(1)
+    error group: 102
+    key: RFC_ERROR_COMMUNICATION
+
+Error:  >Mon Nov 28 18:47:25,128<    RfcException: [null]
+    message: Connect to SAP gateway failed
+    Connection parameters: TPNAME=RFCCNCTDEV GWHOST=${sap2conect.instance.host} GWSERV=sapgw00
+
+ERROR       hostname '${sap2conect.instance.host}' unknown
+TIME        Mon Nov 28 18:47:25 2016
+RELEASE     721
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -2
+MODULE      nixxhl.cpp
+LINE        193
+DETAIL      NiHLGetNodeAddr: hostname cached as unknown
+COUNTER     2
+
+    Return code: RFC_FAILURE(1)
+    error group: 102
+    key: RFC_ERROR_COMMUNICATION
+
+Error:  >Mon Nov 28 18:47:29,128<    RfcException: [null]
+    message: Connect to SAP gateway failed
+    Connection parameters: TPNAME=RFCCNCTDEV GWHOST=${sap2conect.instance.host} GWSERV=sapgw00
+
+ERROR       hostname '${sap2conect.instance.host}' unknown
+TIME        Mon Nov 28 18:47:29 2016
+RELEASE     721
+COMPONENT   NI (network interface)
+VERSION     40
+RC          -2
+MODULE      nixxhl.cpp
+LINE        193
+DETAIL      NiHLGetNodeAddr: hostname cached as unknown
+COUNTER     3
+
+    Return code: RFC_FAILURE(1)
+    error group: 102
+    key: RFC_ERROR_COMMUNICATION
+
+
+**** Error file opened at 20170221 191123 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Tue Feb 21 19:11:23,575<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTDEV from host ??? not allowed
+TIME        Tue Feb 21 17:41:22 2017
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     29397
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+
+**** Error file opened at 20170221 192129 India Standard Time Rel 3.0.10 (2013-08-08) [721.713]
+Error:  >Tue Feb 21 19:21:29,873<    
+>RfcIoException:
+    message: CPIC-CALL: SAP_CMACCPTP3 on convId:         
+
+LOCATION    SAP-Gateway on host rawsedev.redington.dxb / sapgw00
+ERROR       registration of tp RFCCNCTDEV from host ??? not allowed
+TIME        Tue Feb 21 17:51:29 2017
+RELEASE     742
+COMPONENT   SAP-Gateway
+VERSION     2
+RC          720
+MODULE      /bas/742_REL/src/krn/si/gw/gwxxrd.c
+LINE        3623
+COUNTER     29421
+
+    Return code: RFCIO_ERROR_REGISTRATION_DENIED(35)<
+
+
+Error:  >Tue Feb 21 19:21:30,746<    
+>RfcIoException:
+    message: no message received
+    Return code: RFCIO_ERROR_SYSERROR(5)<
+
+
+Error: [2] >Tue Feb 21 19:21:30,746<    RfcException: [IBSHYDNB861|RFCCNCTDEV]
+    message: no message received
+    Return code: RFC_FAILURE(1)
+    error group: 102
+    key: RFC_ERROR_COMMUNICATION
+Exception raised by IBSHYDNB861|RFCCNCTDEV
+

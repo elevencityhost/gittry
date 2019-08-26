@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sftp="http://www.mulesoft.org/schema/mule/sftp" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/sftp http://www.mulesoft.org/schema/mule/sftp/current/mule-sftp.xsd">
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-ftpinbound-logger" doc:name="Connectlogger: Configuration"/>
+
+    <sub-flow name="connect-ftp-inboundsSub_Flow">
+        <connectlogger:debug config-ref="Connectlogger__Configuration" doc:name="Connectlogger" logMessage="In connect ftp inbound" processState="102022102"/>
+        <component class="com.redn.connect.processor.CreateHeaderProperties" doc:name="CreateHeaderProperties"/>
+
+        <component doc:name="Java-CopyFilesFromFTP" class="com.redn.connect.processor.CopyFilesFromFTP"/>
+        <component class="com.redn.connect.processor.CEMWithCustomProperties" doc:name="CEMWithCustomProperties"/>
+    </sub-flow>
+</mule>

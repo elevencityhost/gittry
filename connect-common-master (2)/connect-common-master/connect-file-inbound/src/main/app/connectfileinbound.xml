@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:context="http://www.springframework.org/schema/context" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+
+    <mulexml:jaxb-context name="JAXB_Context" packageNames="com.redn.connect.vo" doc:name="JAXB Context"/>
+	<file:connector name="filePollGlblConn" autoDelete="false"
+		streaming="false" validateConnections="true" doc:name="File" fileAge="${connect.fib.fileAge}"
+		outputAppend="true" />
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-file-inbound-logger" doc:name="Connectlogger: Configuration"/>
+    <flow name="connectfileinboundFlow">
+
+		<file:inbound-endpoint connector-ref="filePollGlblConn"
+			responseTimeout="${connect.fib.response.timeout}" doc:name="receive-file"
+			path="${connect.fib.in.path}" pollingFrequency="${connect.fib.polling.frequency}"
+			 
+			doc:description="This endpoint is used to read a file from the specified 
+			location with specific pattern" moveToDirectory="${connect.fib.staging.path}" moveToPattern="#[message.inboundProperties['originalFilename']]">
+			<file:filename-regex-filter pattern="${connect.fib.polling.pattern}"
+				caseSensitive="false" />
+            <reconnect-forever/>
+		</file:inbound-endpoint>
+        <connectlogger:info config-ref="Connectlogger__Configuration" doc:name="Connectlogger" logMessage="fileinbound started" processState="102013100"/>
+
+        <flow-ref name="StoreHeaderDetailsInVars" doc:name="StoreHeaderDetailsInVars" doc:description="refers to the subHandleConnectExceptionflow flow"/>
+
+        <component doc:name="Set Target Directory Component" class="com.redn.connect.component.SetTargetDirectoryAttributeToMessage" doc:description="calls the setTargetDirectoryAttributeToMessage  java class"/>
+        <choice doc:name="Verify Target Directory Exists" doc:description="check for the Traget Directory existiance">
+        	<when expression="#[flowVars['outputProps'].getTargetDirectory()==null]">
+                <invoke name="renameFileNameToNoTargetDirFound" object-ref="renameFileExtensionBean" method="renameFileWithExtension" doc:name="RenameFileNameToNoTargetDirFound" methodArguments="#[flowVars['outputProps'].getInputFileLocation()],${connect.fib.noTargetDirectory.extension}" doc:description="refers to RenameFileNameToNoTargetDirFound"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="No Target Directory Found For Input File: #[flowVars.resourName]" processState="102013110" doc:name="Connectlogger"/>
+
+                <scripting:component doc:name="Throw No Target Dir Found" doc:description="groovy expression to throw no target directory">
+                    <scripting:script engine="Groovy"><![CDATA[throw new IllegalArgumentException('No Target Directory defined for the input file')]]></scripting:script>
+                </scripting:component>
+        	</when>
+            <otherwise>
+                <flow-ref name="captureHeaderDetails" doc:name="captureHeaderDetails" doc:description="refers to RenameFileNameToNoTargetDirFound"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Target Directory For The Source #[flowVars.messageSource] is #[flowVars['outputProps'].getTargetDirectory()]" processState="102013120" doc:name="Connectlogger"/>
+
+                <expression-component doc:name="Expression-FileAlreayExists-Target" doc:description="Expression-FileAlreayExists-Target"><![CDATA[import java.io.*;
+  fileProps=flowVars.outputProps;
+  tarName = new File(fileProps.getTargetFileLocation());
+  flowVars.isFileExits  = tarName.exists();
+  if(flowVars.isFileExits){
+  flowVars.outputProps.setFileAlreadyEsists(true);
+  }
+  ]]></expression-component>
+                <choice doc:name="Choice-FileAlreayExists-Target" doc:description="check for the file existance">
+                    <when expression="#[flowVars.isFileExits == false]">
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Moving File To Target Directory" processState="102013130" doc:name="Connectlogger"/>
+                        <flow-ref name="WriteFileToTargetDirectory" doc:name="WriteFileToTargetDirectory" doc:description="refers to WriteFileToTargetDirectory flow"/>
+                    </when>
+                    <otherwise>
+
+                        <scripting:transformer doc:name="Throw File Already Exists" doc:description="groovy script to throw  exception">
+                            <scripting:script engine="Groovy"><![CDATA[throw new IllegalArgumentException('The file already processed and available in the target directory')]]></scripting:script>
+                        </scripting:transformer>
+                    </otherwise>
+                </choice>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="globalChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+            </flow>
+
+    
+
+    <sub-flow name="StoreHeaderDetailsInVars">
+        <expression-component doc:name="captureMessageProperties" doc:description="stores's the header details"><![CDATA[flowVars[FPConstants.MESSAGEID]=message.id;
+flowVars[FPConstants.MESSAGEACTION]=new String("");
+flowVars[FPConstants.MESSAGESCOUCE]=new String('');
+flowVars[FPConstants.RESOURCEID]=message.inboundProperties['originalDirectory']+File.seperator+message.inboundProperties['fileName'];
+flowVars[FPConstants.RESOURCENAME]=message.inboundProperties['fileName'];]]></expression-component>
+    </sub-flow>
+  <sub-flow name="captureHeaderDetails">
+        <expression-component doc:name="captureHeaderDetails" doc:description="captureMessageProperties"><![CDATA[flowVars[FPConstants.MESSAGEACTION]=new String("Publish");
+flowVars[FPConstants.RESOURCEID]=flowVars['outputProps'].getResourceId();
+flowVars[FPConstants.MESSAGESCOUCE]=flowVars['outputProps'].getInterfaceName()+"-INBOUND";
+flowVars[FPConstants.RESOURCENAME]=flowVars['outputProps'].getInterfaceName();]]></expression-component>
+    </sub-flow>
+    <sub-flow name="WriteFileToTargetDirectory">
+        <expression-component doc:name="File date format"><![CDATA[import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+	DateFormat utcDateFormat =  new SimpleDateFormat("yyyyMMdd.HHmmssSSS");
+	Date date = new Date();
+
+fileProps=flowVars.outputProps;
+inFiletemp= fileProps.getInputFileLocation();
+targetFiletemp=fileProps.getTargetFileLocation();
+ oldFile = new File(inFiletemp);
+flowVars.archiveFileStatus =oldFile.renameTo(new File(targetFiletemp));
+if(!flowVars.archiveFileStatus)
+flowVars.errorFileStatus =oldFile.renameTo(new File(inFiletemp+".notMoved."+utcDateFormat.format(date)));
+
+
+
+]]></expression-component>
+        <choice doc:name="Archive file status" doc:description="Check for the  file archive status">
+            <when expression="#[flowVars.archiveFileStatus == &quot;true&quot;]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Moving File To Target Directory Is Completed" processState="102013140" doc:name="Connectlogger"/>
+
+                <set-variable variableName="fileName" value="#[flowVars['outputProps'].getFileName()]" doc:name="Store Original File Name" doc:description="Store's the  Original File Name"/>
+                <custom-transformer class="com.redn.connect.transformer.CreateConnectEnterpriseMessage" doc:name="Create Connect EM" doc:description="creates the em"/>
+                <enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+                    <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102013960" doc:name="Connectlogger"/>
+                </enricher>
+                <set-variable variableName="directory" value="#[flowVars['outputProps'].getInputFileLocation()]" doc:name="Store Target Directory" doc:description="Store's the Target Directory"/>
+                <set-property propertyName="serviceName" value="#[flowVars[FPConstants.RESOURCENAME]]" doc:name="Property" doc:description="stores the service name"/>
+
+
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: sending message  to jms ::  #[message]" processState="102013150" doc:name="Connectlogger"/>
+
+                <jms:outbound-endpoint topic="${connect.fib.jms.tarTopic}"  doc:name="JMS" connector-ref="activeMQGlblConn" doc:description="sends the payload to the topic">
+                    <jms:transaction action="NONE"/>
+                </jms:outbound-endpoint>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Not moved to target" processState="102013160" doc:name="Connectlogger"/>
+
+                        <scripting:component doc:name="throw-exception-source-file-is-not-sent to target" doc:description="groovy expression to throw exception">
+                            <scripting:script engine="Groovy"><![CDATA[throw new Exception("Source file was not sent to target location");]]></scripting:script>
+                        </scripting:component>
+            </otherwise>
+        </choice>
+
+
+    </sub-flow>
+
+ 
+  
+
+    
+</mule>

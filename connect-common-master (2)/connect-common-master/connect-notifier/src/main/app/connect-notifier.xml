@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:gmail="http://www.mulesoft.org/schema/mule/gmail" xmlns:smtps="http://www.mulesoft.org/schema/mule/smtps"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+	xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/smtps http://www.mulesoft.org/schema/mule/smtps/current/mule-smtps.xsd
+http://www.mulesoft.org/schema/mule/gmail http://www.mulesoft.org/schema/mule/gmail/current/mule-gmail.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="connect-notifier-logger" doc:name="Connectlogger: Configuration" />
+	<http:request-config name="HTTP_Request_Configuration"
+		host="localhost" port="${connect.notifier.smsservice.http.port}" doc:name="HTTP Request Configuration" />
+	<flow name="connect-notifierFlow" processingStrategy="synchronous">
+		<jms:inbound-endpoint exchange-pattern="request-response"
+			queue="${connect.notifier.activemq.notifier.queuename}"
+			connector-ref="Active_MQ" doc:name="JMS" responseTimeout="99999">
+		</jms:inbound-endpoint>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			doc:name="Connectlogger - Log Received Request" logMessage="::: Notifier Queue Received Message ::: "
+			processState="102014110" />
+		<message-filter throwOnUnaccepted="true"
+			doc:name="Message - Check For CEM Instance">
+			<expression-filter
+				expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]" />
+		</message-filter>
+		<expression-component doc:name="Expression - Set Properties"><![CDATA[payload.getEnterpriseHeader().setComponent(NotifierConstants.CONNECT_NOTIFIER_PREFIX);
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;
+]]></expression-component>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="CEM Validation is Successfull" processState="102014120"
+			doc:name="Connectlogger - Log CEM Validation Successfull" />
+
+		<enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+			<connectlogger:info config-ref="Connectlogger__Configuration"
+				logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]"
+				processState="102014960" doc:name="Connectlogger - Log CEM" />
+		</enricher>
+		<message-filter throwOnUnaccepted="true"
+			doc:name="Message - Check Payload Inside CEM">
+			<expression-filter expression="#[payload.getEnterpriseBody().getAny() != null]" />
+		</message-filter>
+		<component class="com.redn.connect.notifier.processor.ExtractPayloadFromCEM"
+			doc:name="Java - Extract Payload From CEM" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Payload Received As JSON Before Modification === #[payload]"
+			processState="102014130" doc:name="Connectlogger - Log Notification Message Received" />
+		<json:json-to-object-transformer
+			returnClass="com.redn.connect.notifications.request.NotificationMessage"
+			mimeType="application/java" doc:name="JSON to NotificationMessage Transformer" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Transformation From JSON to Notification Message Successfull === #[payload]"
+			processState="102014140" doc:name="Connectlogger - Transformation Successfull" />
+		<component doc:name="Java - Validate Messages Received">
+			<spring-object bean="validateMessagesReceivedBeanName" />
+		</component>
+        <enricher target="#[flowVars.emailMessagePayload]" doc:name="Message Enricher">
+            <flow-ref name="connect-notifier-validate-email-message-attributes" doc:name="connect-notifier-validate-email-message-attributes"/>
+        </enricher>
+       	<scatter-gather doc:name="Scatter-Gather" timeout="2000">
+			<custom-aggregation-strategy ref="notificationServiceAggregationStrategy" />
+			<processor-chain>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[flowVars[NotifierConstants.VAR_EMAIL_MESSAGE_AVAILABLE]]" processState="102014190" doc:name="Connectlogger-Email Message Available"/>
+
+				<message-filter doc:name="Message - Check Email Message Available">
+					<expression-filter
+						expression="#[flowVars[NotifierConstants.VAR_EMAIL_MESSAGE_AVAILABLE]]" />
+				</message-filter>
+                <choice doc:name="Choice">
+                	<when expression="#[flowVars.emailMessagePayload instanceof com.redn.connect.notifications.response.EmailMessageResponse]">
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Validation Failed For Email Message Service Exception Occured In Email Service Flow" processState="102014180" doc:name="Connectlogger-Exception Occured in Email Flow"/>
+
+                        <set-payload value="#[flowVars.emailMessagePayload]" doc:name="Set Payload - Email Message Response As Payload"/>
+                	
+                	</when>
+                	<otherwise>
+                        <flow-ref name="sendEmailMessageToEmailService" doc:name="sendEmailMessageToEmailService"/>
+                	
+                	</otherwise>
+                
+                </choice>
+
+			</processor-chain>
+			<processor-chain>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=" #[flowVars[NotifierConstants.VAR_SMS_MESSAGE_AVAILABLE]]" processState="102014200" doc:name="Connectlogger-SMS Message Available"/>
+
+				<message-filter doc:name="Message - Check SMS Message Available">
+					<expression-filter
+						expression="#[flowVars[NotifierConstants.VAR_SMS_MESSAGE_AVAILABLE]]" />
+				</message-filter>
+				<flow-ref name="SendSMSMessageToSMSService" doc:name="SendSMSMessageToSMSService" />
+
+			</processor-chain>
+		</scatter-gather>
+
+
+		<json:object-to-json-transformer
+			doc:name="Object to JSON" />
+       
+		<exception-strategy ref="ConnectNotifier_Exception_Strategy"
+			doc:name="Reference Exception Strategy" />
+	</flow>
+    <flow name="connect-notifier-validate-email-message-attributes" >
+        <set-variable variableName="emailServiceFlow" value="#[java.lang.Boolean.TRUE]" doc:name="Variable - Email Service Flow"/>
+        <component class="com.redn.connect.notifier.processor.ModifyEmailTemplateOrBodyContent" doc:name="Java - Modify Email Template Or Body Content"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[payload.getCommonAttributesMessage().getRequestID()]" processState="102014990" doc:name="Connectlogger - Log Request ID"/>
+        <exception-strategy ref="emailservice-scatter-gather-exception-stragtegy-flow-2" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+	<flow name="sendEmailMessageToEmailService" >
+
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Modified Email Properties And Sent Payload To Email Service === #[payload]"
+			processState="102014150" doc:name="Connectlogger - Modified Email Properties" />
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Sending CEM With Email Message To Email Service Queue"
+			processState="102014160" doc:name="Connectlogger - Log Sending Email Message" />
+		<component
+			class="com.redn.connect.notifier.processor.SetEmailMessageAsPayload"
+			doc:name="Java - Extract Email Message From Notification Message" />
+		<message-filter doc:name="Message - Check EmailMessage Availability">
+			<expression-filter
+				expression="#[flowVars.emailMessageVar != null &amp;&amp; flowVars.emailMessageVar.getSubject() !=null]" />
+		</message-filter>
+
+        <async doc:name="Async">
+            <remove-property propertyName="#['JMSReplyTo']" doc:name="Property - Remove JMSReplyTo"/>
+            <jms:outbound-endpoint queue="${connect.notifier.activemq.emailservice.queuename}" connector-ref="Active_MQ" responseTimeout="300000" doc:name="JMS - Send To Email Service Queue"/>
+        </async>
+
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="****** CEM With EmailMessage Sent To EmailService Queue *****"
+			processState="102014190" doc:name="Connectlogger - Log EmailMessage Sent To EmailService" />
+		<exception-strategy
+			ref="emailservice-scatter-gather-exception-stragtegy-flow-2"
+			doc:name="Reference Exception Strategy" />
+		<!-- <message-filter doc:name="Message"> <message-filter name=""/> </message-filter> -->
+	</flow>
+
+	<flow name="SendSMSMessageToSMSService">
+		 <set-variable variableName="smsServiceFlow" value="#[java.lang.Boolean.TRUE]" doc:name="Variable - Set SMS Service Flow"/>
+		<connectlogger:info config-ref="Connectlogger__Configuration"
+			logMessage="Sending CEM With SMS Message To SMS Service Queue"
+			processState="102014170" doc:name="Connectlogger - Log Sending SMS Message" />
+		<component
+			class="com.redn.connect.notifier.processor.SetSMSMessageAsPayload"
+			doc:name="Java-ExtractSMSMessageFromNotificationMessage" />
+		<message-filter doc:name="Message - Check SMSMessage Data">
+			<expression-filter
+				expression="#[flowVars.smsMessageVar != null &amp;&amp; flowVars.smsMessageVar.getSource() !=null]" />
+		</message-filter>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Sending Message To SMS service through HTTP Call" processState="102014210" doc:name="Connectlogger-Sending Message To SMS service"/>
+
+		<http:request config-ref="HTTP_Request_Configuration"
+			path="/smsserviceflow" method="POST" doc:name="HTTP - Call SMS Service Flow" />
+
+		<byte-array-to-string-transformer
+			doc:name="Byte Array to String" />
+
+		<json:json-to-object-transformer
+			returnClass="com.redn.connect.notifications.response.SMSMessageResponse"
+			doc:name="JSON to Object" />
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Transformed payload to SMS Response Object" processState="102014220" doc:name="Connectlogger-Transformed payload to SMS Response Object "/>
+
+        <exception-strategy ref="smsservice-scatter-gather-exception-stragtegy-flow-2" doc:name="Reference Exception Strategy"/>
+
+	</flow>
+
+</mule>

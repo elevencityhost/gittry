@@ -1,0 +1,65 @@
+{
+	"type":"object",
+	"$schema": "http://json-schema.org/draft-03/schema",
+	"id": "http://jsonschema.net",
+	"required":false,
+	"properties":{
+		"auditPostRequest": {
+			"type":"object",
+			"id": "http://jsonschema.net/auditPostRequest",
+			"required":true,
+			"properties":{
+				"batch_counter": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/batch_counter",
+					"required":false
+				},
+				"comment": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/comment",
+					"required":false
+				},
+				"external_id": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/external_id",
+					"required":false
+				},
+				"interface_id": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/interface_id",
+					"required":true
+				},
+				"job_id": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/job_id",
+					"required":true
+				},
+				"phase_id": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/phase_id",
+					"required":true
+				},
+				"prop_name": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/prop_name",
+					"required":true
+				},
+				"prop_value": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/prop_value",
+					"required":true
+				},
+				"status_id": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/status_id",
+					"required":false
+				},
+				"system_id": {
+					"type":"string",
+					"id": "http://jsonschema.net/auditPostRequest/system_id",
+					"required":true
+				}
+			}
+		}
+	}
+}

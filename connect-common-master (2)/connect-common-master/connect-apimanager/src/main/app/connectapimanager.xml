@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd">
+   
+<!--     <context:property-placeholder location="connect_config_apimanager.properties"/>
+ -->    
+  
+ <http:listener-config name="HTTP_Listener_Configuration" host="localhost" port="${input.http.port}" doc:name="HTTP Listener Configuration"/>
+ 
+        <apikit:config name="apimanager" raml="apimanager.raml" consoleEnabled="true" consolePath="console" doc:name="Router"/>
+    <!-- <mulexml:jaxb-context name="JAXB_Context" packageNames="com.redn.connect.vo" doc:name="JAXB Context"/> -->
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-apimanager-logger" doc:name="Connectlogger: Configuration"/>
+     <flow name="connectapimanagerFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="${input.http.path}" doc:name="HTTP"/>
+
+        <apikit:router config-ref="apimanager" doc:name="APIkit Router"/>
+        <exception-strategy ref="global-exceptionhandlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="post:/messaging:apimanager">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Connect-apimanager received message  ::" processState="102002100" doc:name="Connectlogger"/>
+
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <message-filter throwOnUnaccepted="true" doc:name="Validate CEM">
+            <expression-filter expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]"/>
+        </message-filter>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: connect-apimanager message processing started ::" processState="102002101" doc:name="Connectlogger"/>
+        <expression-component doc:name="StoreInboundProperties "><![CDATA[payload.getEnterpriseHeader().setComponent("connect-apimanager");
+flowVars[APIManagerConstants.VAR_ENTERPRISE_MESSAGE]= payload;
+flowVars[APIManagerConstants.VAR_DOC_NUM] = message.inboundProperties.DOCNUM;
+flowVars[APIManagerConstants.VAR_CRE_DAT]  = message.inboundProperties.CREDAT;
+flowVars[APIManagerConstants.VAR_CRE_TIM] =message.inboundProperties.CRETIM;
+flowVars[APIManagerConstants.VAR_MSG_TYPE]= message.inboundProperties['message_type'];
+flowVars[APIManagerConstants.VAR_CONTENT_TYPE]= message.inboundProperties['content-type'];
+]]></expression-component>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Inbound Properties Value: #[flowVars.DOCNUM],#[flowVars.CREDAT], #[flowVars.CRETIM]" processState="102002110" doc:name="Connectlogger"/>
+        <expression-component doc:name="Store header Properties "><![CDATA[flowVars[APIManagerConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[APIManagerConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[APIManagerConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[APIManagerConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[APIManagerConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[APIManagerConstants.VAR_SOURCE_SYSTEM]= payload.getEnterpriseHeader().getSourceSystem();
+flowVars[APIManagerConstants.VAR_COMMUNICATION]= payload.getEnterpriseHeader().getCommunication();
+flowVars[APIManagerConstants.VAR_PRIORITY]= payload.getEnterpriseHeader().getPriority();]]></expression-component>
+        <enricher doc:name="Message Enricher" target="#[flowVars.logCEM]">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102002960" doc:name="Connectlogger"/>
+
+        </enricher>
+
+        <flow-ref name="findLogicalTarget" doc:name="findLogicalTarget"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: connect-apimanager message processing completed ::" processState="204002190" doc:name="Connectlogger"/>
+
+        <exception-strategy ref="global-exceptionhandlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    <!-- <sub-flow name="createEnterpriseResponse">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Entered create enterprise response of api manager" processState="102002170" doc:name="log-create-enterprise-response"/>
+
+        <choice doc:name="Check-content-type">
+            <when expression="#[flowVars.contentType.contains('text/xml')]">
+                <custom-transformer class="com.redn.connect.transformer.CreateXMLEnterpriseResponse" doc:name="Create XML Enterprise Response"/>
+            </when>
+            <otherwise>
+                <logger message="Invalid content type" level="INFO" doc:name="log-invalid-content-type"/>
+            </otherwise>
+        </choice>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Enterprise response created from api manager " processState="102002180" doc:name="Connectlogger"/>
+
+    </sub-flow> -->
+    <sub-flow name="findLogicalTarget">
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Determining the logical target flow started ::" processState="102002120" doc:name="log-info-logical-target-flow-started"/>
+
+
+        <choice doc:name="Check-action">
+            <when expression="#[flowVars.messageAction == 'AS2']">
+                <flow-ref name="setMessageProperties" doc:name="setMessageProperties"/>
+                <set-payload value="#[flowVars.enterpriseMessage]" doc:name="Set Payload"/>
+
+                <set-property propertyName="messageType" value="#[flowVars[APIManagerConstants.VAR_MSG_TYPE]]" doc:name="MessageSelectorKey"/>
+                <connectlogger:info doc:name="Connectlogger" config-ref="Connectlogger__Configuration" processState="102002180" logMessage="MessageSelectorKey is :: #[flowVars[APIManagerConstants.VAR_MSG_TYPE]] and topic is ${connect.edi.topic}"/>
+                <jms:outbound-endpoint topic="${connect.edi.topic}" connector-ref="Global_Active_MQ" doc:name="JMS"/>
+            </when>
+            <when expression="#[flowVars.messageAction == 'Non AS2']">
+                <choice doc:name="Check-communication">
+                    <when expression="#[flowVars.communication == 'Sync']">
+
+                        <set-payload value="#[flowVars.enterpriseMessage]" doc:name="Set Payload"/>
+						  <set-property propertyName="source" value="#[message.inboundProperties['source']]" doc:name="set source ATP"/>
+        				  <set-property propertyName="relativePath" value="#[message.inboundProperties['relativePath']]" doc:name="set relative property"/>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Message before Sending To ATP from apimanager : #[message]" processState="102002140" doc:name="Connectlogger"/>
+                        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Queue name at receiving end should be --&gt; consumer.#[message.outboundProperties.relativePath].#[message.outboundProperties.'source'].queue" processState="102002150" doc:name="Connectlogger"/>
+
+
+                        <jms:outbound-endpoint exchange-pattern="request-response" queue="consumer.#[message.outboundProperties.relativePath].#[message.outboundProperties.'source'].queue" connector-ref="Global_Active_MQ" doc:name="JMS" responseTimeout="1000000">
+                            <jms:transaction action="NONE" timeout="100000"/>
+                        </jms:outbound-endpoint>
+                        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+                        <logger message="#[message] , #[payload]" level="INFO" doc:name="Log After API Manager JMS "/>
+                       <!--  <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+                        <connectlogger:info config-ref="Connectlogger__Configuration" doc:name="Connectlogger" logMessage="message recive from jms successfully" processState="102002160"/> -->
+
+
+                    </when>
+                    <when expression="#[flowVars.communication == 'Async']">
+
+                        <flow-ref name="setMessageProperties" doc:name="setMessageProperties"/>
+
+                        <set-payload value="#[flowVars.enterpriseMessage]" doc:name="Set Payload"/>
+                        <connectlogger:info doc:name="Connectlogger" config-ref="Connectlogger__Configuration" processState="102002190" logMessage="MessageSelectorKey is :: #[flowVars[APIManagerConstants.VAR_SERVICE_NAME].toLowerCase()] and topic is ${connect.ns.topic}"/>
+                        <jms:outbound-endpoint topic="${connect.ns.topic}" connector-ref="Global_Active_MQ" doc:name="JMS"/>
+                        <!-- <flow-ref name="createEnterpriseResponse" doc:name="createEnterpriseResponse"/> -->
+                    </when>
+                    <otherwise>
+                        <scripting:component doc:name="Communication Error">
+                            <scripting:script engine="Groovy"><![CDATA[import com.redn.connect.exception.ConnectException;
+import com.redn.connect.exception.Category;
+import com.redn.connect.constants.APIManagerConstants;
+import com.redn.connect.constants.ConnectConstants;
+
+if(sessionVars.MESCOD!=null){
+throw new ConnectException(APIManagerConstants.ERROR_CODE_INVALID_COMMUNICATION_SAP,APIManagerConstants.ERROR_DESCRIPTION_INVALID_COMMUNICATION_SAP,Category.COMM, ConnectConstants.CONST_EXCEPTION_ORIGIN_SAP);
+}
+else{
+throw new ConnectException(APIManagerConstants.ERROR_CODE_INVALID_COMMUNICATION_HTTP,APIManagerConstants.ERROR_DESCRIPTION_INVALID_COMMUNICATION_HTTP,Category.COMM, ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_CONNECTHTTP);
+} ]]></scripting:script>
+                        </scripting:component>
+
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <scripting:component doc:name="Action Error">
+                    <scripting:script engine="Groovy"><![CDATA[import com.redn.connect.exception.ConnectException;
+import com.redn.connect.exception.Category;
+import com.redn.connect.constants.APIManagerConstants;
+import com.redn.connect.constants.ConnectConstants;
+
+if(sessionVars.MESCOD!=null){
+throw new ConnectException(APIManagerConstants.ERROR_CODE_INVALID_ACTION_SAP,APIManagerConstants.ERROR_DESCRIPTION_INVALID_ACTION_SAP,Category.COMM, ConnectConstants.CONST_EXCEPTION_ORIGIN_SAP);
+}
+else{
+throw new ConnectException(APIManagerConstants.ERROR_CODE_INVALID_ACTION_HTTP,APIManagerConstants.ERROR_DESCRIPTION_INVALID_ACTION_HTTP,Category.COMM, ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_CONNECTHTTP);
+} ]]></scripting:script>
+                </scripting:component>
+
+            </otherwise>
+        </choice>
+
+    </sub-flow>
+    <sub-flow name="setMessageProperties">
+        <choice doc:name="Check-message-type">
+            <when expression="#[null!=flowVars.messageType]">
+
+                <set-property propertyName="messageType" value="#[flowVars[APIManagerConstants.VAR_MSG_TYPE]]" doc:name="msgSelectorKey"/>
+            </when>
+            <otherwise>
+
+                <set-property propertyName="serviceName" value="#[flowVars[APIManagerConstants.VAR_SERVICE_NAME]!=null ? flowVars[APIManagerConstants.VAR_SERVICE_NAME].toLowerCase() : flowVars[APIManagerConstants.VAR_SERVICE_NAME]]" doc:name="msgSelectorKey" doc:description="This property stores the messageSelectorKey"/>
+            </otherwise>
+        </choice>
+				<!-- <set-property propertyName="source" value="#[flowVars.source!=null ? flowVars.source.toLowerCase() : flowVars.source]" doc:name="source" doc:description="This property stores the Source"/>
+				<set-property propertyName="serviceName" value="#[flowVars.serviceName!=null ? flowVars.serviceName.toLowerCase() : flowVars.serviceName]" doc:name="serviceName" doc:description="This property stores the ResourceName"/>
+				<set-property propertyName="messageSource" value="#[flowVars.messageSource!=null ? flowVars.messageSource.toLowerCase() : flowVars.messageSource]" doc:name="messageSource" doc:description="This property stores the ResourceId"/>
+				<set-property propertyName="action" value="#[flowVars.action!=null ? flowVars.action.toLowerCase() : flowVars.action]" doc:name="action" doc:description="This property stores the Action"/>
+				<set-property propertyName="communication" value="#[flowVars.communication!=null ? flowVars.communication.toLowerCase() : flowVars.communication]" doc:name="communication" doc:description="This property stores the Commuication"/>
+				<set-property propertyName="priority" value="#[flowVars.priority!=null ? flowVars.priority.toLowerCase() : flowVars.priority]" doc:name="priority" doc:description="This property stores the Priority"/>
+				<set-property propertyName="target" value="#[flowVars.target!=null ? flowVars.target.toLowerCase() : flowVars.target]" doc:name="target" doc:description="This property stores the Target"/> -->
+        <expression-component doc:name="SetCEMproperties"><![CDATA[if(flowVars[APIManagerConstants.SOURCE]!=null)
+{ flowVars[APIManagerConstants.SOURCE].toLowerCase() }
+else
+{flowVars[APIManagerConstants.SOURCE] }
+if(flowVars[APIManagerConstants.VAR_SERVICE_NAME]!=null)
+{ flowVars[APIManagerConstants.VAR_SERVICE_NAME].toLowerCase() }
+else { flowVars[APIManagerConstants.VAR_SERVICE_NAME] }
+if(flowVars[APIManagerConstants.VAR_MESSAGE_SOURCE]!=null)
+{flowVars[APIManagerConstants.VAR_MESSAGE_SOURCE].toLowerCase()}
+else { flowVars[APIManagerConstants.VAR_MESSAGE_SOURCE] }
+if(flowVars[APIManagerConstants.VAR_MESSAGE_ACTION]!=null )
+{ flowVars[APIManagerConstants.VAR_MESSAGE_ACTION].toLowerCase()}
+else { flowVars[APIManagerConstants.VAR_MESSAGE_ACTION] }
+if(flowVars[APIManagerConstants.VAR_COMMUNICATION]!=null)
+{ flowVars[APIManagerConstants.VAR_COMMUNICATION].toLowerCase()}
+else { flowVars[APIManagerConstants.VAR_COMMUNICATION] }
+if(flowVars[APIManagerConstants.VAR_PRIORITY]!=null )
+{ flowVars[APIManagerConstants.VAR_PRIORITY].toLowerCase()}
+else { flowVars[APIManagerConstants.VAR_PRIORITY] }
+if(flowVars[APIManagerConstants.VAR_TARGET_SYSTEM]!=null)
+{ flowVars[APIManagerConstants.VAR_TARGET_SYSTEM].toLowerCase()}
+else { flowVars[APIManagerConstants.VAR_TARGET_SYSTEM] }]]></expression-component>
+	</sub-flow>
+
+</mule>

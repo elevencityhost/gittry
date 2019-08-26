@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+	<munit:config name="munit" doc:name="MUnit configuration"
+		mock-connectors="false" mock-inbounds="false" />
+
+	<spring:beans>
+		<spring:import resource="classpath:connect-ftps-outbound.xml" />
+		<spring:import resource="classpath:nbd-ftps-outbound.xml" />
+		<spring:import resource="classpath:global-configurations.xml" />
+		<spring:import resource="classpath:global-connectors.xml" />
+		<spring:import resource="classpath:exception-handler.xml" />
+	</spring:beans>
+
+	<context:property-placeholder location="connect_config_ftps_outbound.properties" />
+
+	<configuration doc:name="reusable classes">
+		<expression-language autoResolveVariables="true">
+			<import class="com.redn.connect.test.TestFTPSOutboundConstants" />
+		</expression-language>
+	</configuration>
+
+	<munit:test
+		name="connect-ftps-outbound-test-suite-connect-ftps-outbound-correct-cemasstring-FlowTest"
+		description="Test" >
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['FTPS - Server']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+		<!-- <mock:when doc:name="Mock - FTPS Server" messageProcessor=".*:.*"> 
+			<mock:with-attributes> <mock:with-attribute name="doc:name" whereValue="#['FTPS 
+			- Server']" /> </mock:with-attributes> <mock:then-return payload="#['File 
+			Posted To FTPS Server']" /> </mock:when> -->
+		<set-variable variableName="#[TestFTPSOutboundConstants.CEM_AS_STRING]"
+			value="#['cemasstring.xml']" doc:name="Variable - Set Correct CEM As String Ref" />
+		<logger message="======Before ==== #[message]" level="INFO"
+			doc:name="Logger" />
+		<component class="com.redn.connect.test.TestPrepareCEMFromString"
+			doc:name="Java - Test Prepare CEM" />
+		<flow-ref name="connect-ftps-outboundFlow" doc:name="connect-ftps-outboundFlow" />
+		<mock:verify-call messageProcessor=".*:.*" doc:name="Verify Call">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Connectlogger - ftps flow completed']" />
+			</mock:with-attributes>
+		</mock:verify-call>
+	</munit:test>
+
+	<munit:test
+		name="connect-ftps-outbound-test-suite-connect-ftps-outbound-wrong-cemasstring-FlowTest"
+		description="Test" >
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEH">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Send Exception to CEH']" />
+			</mock:with-attributes>
+			<mock:then-return payload="#[]" />
+		</mock:when>
+		<set-variable variableName="#[TestFTPSOutboundConstants.WRONG_CEM_AS_STRING]"
+			value="#['wrongcemasstring.xml']" doc:name="Variable - Set Correct CEM As String Ref" />
+		<logger message="======Before ==== #[message]" level="INFO"
+			doc:name="Logger" />
+		<component class="com.redn.connect.test.TestPrepareCEMFromString"
+			doc:name="Java - Test Prepare CEM" />
+		<flow-ref name="connect-ftps-outboundFlow" doc:name="connect-ftps-outboundFlow" />
+		<munit:assert-true
+			condition="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseException]"
+			doc:name="Assert True" />
+	</munit:test>
+
+	<munit:test
+		name="connect-ftps-outbound-test-suite-connect-ftps-outbound-cemasobj-FlowTest"
+		description="Test" >
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['FTPS - Server']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+		<component class="com.redn.connect.test.TestPrepareCEM"
+			doc:name="Java - Test Prepare CEM With Custom Props" />
+		<flow-ref name="connect-ftps-outboundFlow" doc:name="connect-ftps-outboundFlow" />
+		<mock:verify-call messageProcessor=".*:.*"
+			doc:name="Verify Call - FTPS Flow Completed">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Connectlogger - ftps flow completed']" />
+			</mock:with-attributes>
+		</mock:verify-call>
+	</munit:test>
+
+	<munit:test
+		name="connect-ftps-outbound-test-suite-connect-ftps-outbound-cemwithoutcustomobj-FlowTest"
+		description="Test">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEH">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Send Exception to CEH']" />
+			</mock:with-attributes>
+			<mock:then-return payload="#[]" />
+		</mock:when>
+		<component class="com.redn.connect.test.TestPrepareCEMWithOutCustomProps"
+			doc:name="Java - Test Prepare CEM Without Custom Props" />
+		<flow-ref name="connect-ftps-outboundFlow" doc:name="connect-ftps-outboundFlow" />
+		<munit:assert-true
+			condition="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseException]"
+			doc:name="Assert True" />
+	</munit:test>
+	
+	<munit:test
+		name="connect-ftps-outbound-test-suite-connect-ftps-outbound-noncemobj-FlowTest"
+		description="Test">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEH">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Send Exception to CEH']" />
+			</mock:with-attributes>
+			<mock:then-return payload="#[]" />
+		</mock:when>
+		<component class="com.redn.connect.test.TestPrepareNonCEM"
+			doc:name="Java - Test Prepare CEM Without Custom Props" />
+		<flow-ref name="connect-ftps-outboundFlow" doc:name="connect-ftps-outboundFlow" />
+		<munit:assert-true
+			condition="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseException]"
+			doc:name="Assert True" />
+	</munit:test>
+	
+	<munit:test
+		name="connect-ftps-outbound-test-suite-connect-ftps-outbound-cemobj-withmultipleattachments-FlowTest"
+		description="Test">
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['FTPS - Server']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+		<component class="com.redn.connect.test.TestPrepareCEMWithMultipleAttachments"
+			doc:name="Java - Test Prepare CEM Without Custom Props" />
+		<flow-ref name="connect-ftps-outboundFlow" doc:name="connect-ftps-outboundFlow" />
+		<mock:verify-call messageProcessor=".*:.*" doc:name="Verify Call">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Connectlogger - ftps flow completed']" />
+			</mock:with-attributes>
+		</mock:verify-call>
+	</munit:test>
+</mule>

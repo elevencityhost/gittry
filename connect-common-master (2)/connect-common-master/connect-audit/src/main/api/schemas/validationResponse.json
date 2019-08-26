@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "STATUS": {
+        "type": "string"
+      },
+      "PROP_NAME": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "STATUS",
+      "PROP_NAME"
+    ]
+  }
+}

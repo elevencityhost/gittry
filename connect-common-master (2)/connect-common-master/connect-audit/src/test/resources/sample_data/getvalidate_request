@@ -1,0 +1,6 @@
+http://localhost:9090/cnaudit/validate?job_id=&interface_id=
+
+in headers i have given below
+
+job_id =TestCaseEntrytest3
+interface_id =LEN001

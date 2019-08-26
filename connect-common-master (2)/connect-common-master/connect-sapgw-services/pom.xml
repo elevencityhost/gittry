@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+      		<groupId>com.redn.connect</groupId>
+      		<artifactId>connect-global-dependencies</artifactId>
+      		<version>1.2</version>
+   	</parent>
+	<groupId>com.redn.connect</groupId>
+	<artifactId>connect-sapgw-services</artifactId>
+	<version>1.2</version>
+	<packaging>mule</packaging>
+	<name>Mule connect-sapgw-services Application</name>
+
+	<properties>
+		<mule-transport-sap.version>3.0.1</mule-transport-sap.version>
+		<connect2sap-common.version>1.0</connect2sap-common.version>
+	</properties>
+
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.mule.tools.maven</groupId>
+				<artifactId>mule-app-maven-plugin</artifactId>
+				<version>${mule-app-maven-plugin-version}</version>
+				<extensions>true</extensions>
+				<configuration>
+					<copyToAppsDirectory>true</copyToAppsDirectory>
+					<inclusions>
+						<inclusion>
+							<groupId>com.mulesoft.muleesb.transports</groupId>
+							<artifactId>mule-transport-sap</artifactId>
+						</inclusion>
+					</inclusions>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<dependencies>
+		<dependency>
+			<groupId>com.mulesoft.muleesb.transports</groupId>
+			<artifactId>mule-transport-sap</artifactId>
+			<version>${mule-transport-sap.version}</version>
+			<scope>provided</scope>			
+		</dependency>
+		
+	</dependencies>
+
+</project>

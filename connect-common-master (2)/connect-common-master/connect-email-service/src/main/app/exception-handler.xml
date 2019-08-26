@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.8.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd 
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+
+	<choice-exception-strategy name="emailserviceExceptionStrategy">
+
+		<catch-exception-strategy doc:name="filterUnAcceptedExceptionStrategy"
+			when="#[exception.causedBy(org.mule.api.routing.filter.FilterUnacceptedException)]">
+			<flow-ref name="subHandleFilterUnAcceptedflow" doc:name="subHandleFilterUnAcceptedflow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(com.redn.connect.exception.ConnectException)]"
+			doc:name="connectExceptionCatchExceptionStrategy">
+			<flow-ref name="subHandleOtherExceptionflow" doc:name="subHandleOtherExceptionflow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(org.mule.api.transformer.TransformerException)]"
+			doc:name="subTransformationExceptionStrategy">
+			<flow-ref name="subTransformationExceptionflow" doc:name="subTransformationExceptionflow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedBy(javax.jms.JMSException)]" doc:name="JMSException">
+			<flow-ref name="subJMSExceptionflow" doc:name="subJMSExceptionflow"
+				doc:description="Refers to common error handling sub-flow" />
+		</catch-exception-strategy>
+		<catch-exception-strategy doc:name="Catch Exception Strategy">
+			<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=EmailServiceConstants.ERROR_CODE_SMTP_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=EmailServiceConstants.EXCEPTION_ORIGIN_REDINGTON_GULF;]]>
+			</expression-component>
+			<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" />
+		</catch-exception-strategy>
+	</choice-exception-strategy>
+
+	<sub-flow name="subHandleFilterUnAcceptedflow">
+		<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=EmailServiceConstants.ERROR_CODE_FILTER_UNACCEPTED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=ConnectConstants.CONST_MESSAGE_ENTERPRISE_MESSAGE_VALIDATION_FAILED;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]>
+		</expression-component>
+		<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow"
+			doc:description="invoke handle error flow" />
+	</sub-flow>
+
+	<sub-flow name="subTransformationExceptionflow">
+		<expression-component doc:name="set exception properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=EmailServiceConstants.ERROR_CODE_INVALID_JSON_DATA_RECEIVED;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=EmailServiceConstants.ERROR_CODE_INVALID_JSON_DATA_RECEIVED_DESC;
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]>
+		</expression-component>
+		<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow"
+			doc:description="invoke handle error flow" />
+	</sub-flow>
+
+	<sub-flow name="subPrepareEEandSendToCEHflow">
+		<custom-transformer
+			class="com.redn.connect.transformer.CreateXMLEnterpriseExceptionTransformer"
+			doc:name="CreateXMLEnterpriseExceptionTransformer" />
+
+		<jms:outbound-endpoint
+			queue="${connect.emailservice.activemq.exception.queuename}"
+			doc:name="JMS Queue" connector-ref="Active_MQ">
+			<jms:transaction action="NONE" />
+		</jms:outbound-endpoint>
+		<connectlogger:error config-ref="Connectlogger__Configuration"
+			logMessage="CEE sent to CEH" processState="400014160" doc:name="Connectlogger" />
+	</sub-flow>
+
+
+	<sub-flow name="subHandleOtherExceptionflow">
+		<expression-component doc:name="Set Exception details"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=EmailServiceConstants.ERROR_CODE_OTHER;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.TECH;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_ESB_NS;]]></expression-component>
+
+		<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" />
+	</sub-flow>
+
+	<sub-flow name="subJMSExceptionflow">
+		<expression-component doc:name="Set Exception details"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=EmailServiceConstants.ERROR_CODE_JMS;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]=exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=ConnectConstants.CONST_EXCEPTION_ORIGIN_ACTIVEMQ;]]></expression-component>
+
+		<flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow" />
+	</sub-flow>
+
+</mule>

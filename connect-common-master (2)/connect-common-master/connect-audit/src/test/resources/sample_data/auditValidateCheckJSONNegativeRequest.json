@@ -1,0 +1,9 @@
+{
+	"validationPutRequest":
+		{
+			"interface_id":"wrong-interface-id",
+			"job_id":"TestCaseEntryvalidate",
+			"system_id":"2000",
+			"prop_name":["DEF_CRDT_AMOUNT"]
+		}
+}

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+    <http:listener-config name="HTTP_Listener_Configuration" host="localhost" port="8099" doc:name="HTTP Listener Configuration"/>
+    
+    
+    <flow name="testFlow">
+        <jms:inbound-endpoint topic="abc" connector-ref="Active_MQ" doc:name="JMS"/>
+        <logger message="#[message]  #[payload]  ======= 1" level="INFO" doc:name="Logger"/>
+        <component class="com.redn.connect.ftp.util.CEMProcessor" doc:name="Java"/>
+        <logger message="#[message]  #[payload]  ======= 2" level="INFO" doc:name="Logger"/>
+        <logger message="  #[flowVars.filename]   ============================   &quot;flowVars.filename&quot;" level="INFO" doc:name="Logger"/>
+        <logger message="#[flowVars.interfacename]   ============================   &quot;flowVars.interfacename&quot;" level="INFO" doc:name="Logger"/>
+        <logger message="#[flowVars.ftpname]   ============================   &quot;flowVars.ftpname&quot;" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="testFlow1">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/fileob" doc:name="HTTP"/>
+        
+        <!-- use the test class TEstCEM java class which is commented below for testing -->
+        <!--<component class="com.redn.connect.ftp.util.TEstCEMCreation" doc:name="TEstCEMCreation"/>
+                  -->
+                  
+                  
+                  
+        <jms:outbound-endpoint  connector-ref="Active_MQ" doc:name="JMS" topic="${connect.fileoutgw.topic}"/>
+        <set-payload value="#['Sended Edifact file successfully']" doc:name="Set Payload"/>
+    </flow>
+</mule>

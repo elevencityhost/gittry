@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <file:connector name="File" autoDelete="true" streaming="true" validateConnections="true" doc:name="File"/>
+    <http:request-config name="HTTP_Request_Configuration1" host="localhost" port="${input.http.port}" doc:name="HTTP Request Configuration"/>
+    <http:listener-config name="HTTP_Listener_Configuration1" host="localhost" port="8081" doc:name="HTTP Listener Configuration"/>
+    <spring:beans>
+        <spring:bean id="PrepareTestBean" name="PrepareTestBean" class="com.redn.connect.transformer.PrepareTest"/>
+    </spring:beans>
+    <flow name="testflowFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration1" path="/test" doc:name="HTTP"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+      <!--  <set-session-variable variableName="action" value="AS2" doc:name="Session Variable"/>
+        <set-session-variable variableName="communication" value="Async" doc:name="Session Variable"/> -->
+        <!-- <expression-component doc:name="Expression"><![CDATA[import com.redn.connect.util.ConnectUtils;
+import com.redn.connect.vo.ConnectEnterpriseMessage;
+
+
+ConnectUtils utils1 = new ConnectUtils();
+ConnectEnterpriseMessage cem = utils1.buildConnectEnterprsieMessage(payload);
+cem.getEnterpriseHeader().setTargetSystem("Lenovo");
+cem.getEnterpriseBody().getAny();
+
+payload = cem;]]></expression-component> -->
+     <invoke object-ref="PrepareTestBean" method="getCEM" methodArguments="#[payload]" methodArgumentTypes="java.lang.String" doc:name="Invoke"/>
+        <http:request config-ref="HTTP_Request_Configuration1" path="/api/messaging" method="POST" doc:name="HTTP"/>
+    </flow>
+</mule>

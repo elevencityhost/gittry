@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+   
+   <connectlogger:config name="ConnectloggerConn" loggerName="connect-connect2sap-logger" doc:name="Connectlogger: Configuration"/>
+   
+   <file:connector name="File_Config" autoDelete="true"
+		streaming="true" validateConnections="true" doc:name="File"
+		outputPattern="#[flowVars.outputFileName]" />
+		
+    <flow name="connect2sap-commonFlow">
+        <jms:inbound-endpoint queue="${connect2sap.common.receiver.queue}" connector-ref="Connect2sapCommonActiveMqConn" doc:name="jms receiver queue">
+            <jms:transaction action="NONE"/>
+        </jms:inbound-endpoint>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: Recived message in connect2sap-common :: #[payload]" processState="102010200" doc:name="Connectlogger"/>
+        <choice doc:name="Check Payload Type">
+        	<when expression="#[payload instanceof java.lang.String  &amp;&amp;  null != payload]">
+                <connectlogger:info config-ref="ConnectloggerConn" logMessage="Received java.lang.String  As Payload Converting To CEM Object" processState="102010210" doc:name="Connectlogger-Log"/>
+                <set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]" doc:name="Set CEM Object As Payload"/>
+
+        	</when>
+        	<otherwise>
+                <connectlogger:info config-ref="ConnectloggerConn" logMessage="Received payload is not an instance of string" processState="102010220" doc:name="Connectlogger"/>
+        	
+        	</otherwise>
+        </choice>
+        <flow-ref name="CaptureEMDetailsAndSetPayLoadAndSendToSAP" doc:name="CaptureEMDetailsAndSetPayLoadAndSendToSAP"/>
+        <set-variable variableName="SAPDestinationQueue" value="#[flowVars[ConnectConstants.VAR_IDOC_SOURCE_TYPE]].queue" doc:name="Variable"/>
+        <component class="com.redn.connect.sapgw.processor.Connect2SAPProcessor" doc:name="Connect2SAPProcessor"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: connect2sap sending CEM to #[flowVars.ZuulSAPDestinationQueue]" processState="102010268" doc:name="Connectlogger"/>
+        <set-payload value="#[flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]]" doc:name="Set CEM As Payload"/>
+        <jms:outbound-endpoint queue="#[flowVars.ZuulSAPDestinationQueue]" connector-ref="Connect2sapCommonActiveMqConn" doc:name="jms sender queue"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: connect2sap common message processing completed successfully ::" processState="102010270" doc:name="Connectlogger"/>
+        <exception-strategy ref="sapgw-common-global-exceptionhandlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    	<sub-flow name="CaptureEMDetailsAndSetPayLoadAndSendToSAP">
+        <set-variable variableName="#[ConnectConstants.VAR_ENTERPRISE_MESSAGE]" value="#[payload]" doc:name="StoreCEM "/>
+        <expression-component doc:name="CaptureHeaderProperties"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-connect2sap");
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]= payload;
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_SOURCE_SYSTEM]= payload.getEnterpriseHeader().getSourceSystem();
+flowVars[ConnectConstants.VAR_COMMUNICATION]= payload.getEnterpriseHeader().getCommunication();
+flowVars[ConnectConstants.VAR_PRIORITY]= payload.getEnterpriseHeader().getPriority();
+message.outboundProperties[ConnectConstants.VAR_ENTERPRISE_MESSAGE]=payload;
+]]></expression-component>
+        <component doc:name="Java-Extract RefNum And SO Number From CEM ">
+            <spring-object bean="springExtractCEMPropertiesBeanId"/>
+        </component>
+        <enricher doc:name="Message Enricher" target="#[flowVars.logCEM]">
+            <connectlogger:info config-ref="ConnectloggerConn" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102010960" doc:name="Connectlogger-Log CEM"/>
+
+        </enricher>
+        <component class="com.redn.connect.sapgw.processor.SAPDestinationProcessor" doc:name="SAPDestinationProcessor"/>
+        <message-filter throwOnUnaccepted="true" doc:name="Validate Enterprise Body">
+            <expression-filter expression="#[payload.getEnterpriseBody()!=null&amp;&amp;null!=payload.getEnterpriseBody().getAny()]"/>
+        </message-filter>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage="in connect2sap enterprise body Successfully validate" processState="102010230" doc:name="Connectlogger"/>
+        <flow-ref name="SendFileDataToArchiveLocation" doc:name="SendFileDataToArchiveLocation"/>
+		
+	</sub-flow>
+	
+	<sub-flow name="SendFileDataToArchiveLocation">
+	<component doc:name="Extract Payload without XML prolog">
+            <spring-object bean="SpringRemovePrologBean"/>
+        </component>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage="Send Created IDOC To Archive Location from connect2sap-common" processState="102010240" doc:name="Connectlogger"/>
+        <component class="com.redn.connect.sapgw.processor.AddPropertiesToCEM" doc:name="Set File Archive Location"/>
+        <file:outbound-endpoint path="#[flowVars.fileArchiveLocationOfConnect2SAP]" connector-ref="File_Config" responseTimeout="10000" doc:name="Archive_File"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: file archiving has done successfully in connect2sap ::" processState="102010260" doc:name="Connectlogger"/>
+    </sub-flow>
+</mule>

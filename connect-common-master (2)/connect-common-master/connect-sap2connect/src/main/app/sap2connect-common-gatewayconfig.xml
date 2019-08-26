@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+
+	
+    <http:request-config name="HTTP_Request_Configuration" port="${connect.sap2connect.apimanager.port}" doc:name="HTTP Request Configuration" host="${connect.sap2connect.apimanager.host}" responseTimeout="30000"/> 
+    <file:connector name="File_Archive_Config" outputPattern="#[sessionVars['serviceName']]-#[sessionVars['messageId']]-#[ConnectUtils.getCurrentTimeAsString()].xml" autoDelete="false" streaming="true" validateConnections="true" doc:name="File"/>
+    <sub-flow name="sap2gatewayconfigFlow">
+
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="accept Idoc in sap2connect and process for valitation " processState="102017120" doc:name="Connectlogger"/>
+        <flow-ref name="constructCEM" doc:name="constructCEM"/>
+        <message-filter throwOnUnaccepted="true" doc:name="Valid Enterprise Message ">
+            <expression-filter expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]"/>
+        </message-filter>
+        <flow-ref name="receiveCEMAndSendToApiManager" doc:name="receiveCEMAndSendToApiManager"/>
+
+    </sub-flow>
+    <sub-flow name="constructCEM">
+        <!-- <vm:inbound-endpoint exchange-pattern="request-response" path="${sap2connect.vm.route.idoc.for.em.preparer}" doc:name="Construct-EnterpriseMessage"/> -->
+
+        <message-properties-transformer doc:name="Acquire-Message Properties">
+           <add-message-property key="IDOCTYP" value="#[xpath3('/ORDERS05/IDOC/EDI_DC40/IDOCTYP').text]"/>
+            <add-message-property key="DOCNUM" value="#[xpath3('/ORDERS05/IDOC/EDI_DC40/DOCNUM').text]"/>
+            <add-message-property key="MESTYP" value="#[xpath3('/ORDERS05/IDOC/EDI_DC40/MESTYP').text]"/>
+
+        </message-properties-transformer>
+       <!--  <message-properties-transformer doc:name="Store-Enterprise-Logger-name">
+            <add-message-property key="loggerName" value="${sap2es.logger.lname}"/>
+            <add-message-property key="loggerServiceName" value="${sap2es.logger.service.name}"/>
+        </message-properties-transformer> -->
+       
+         <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="store enterprise message from sap2connect #[payload]" processState="102017140" doc:name="Connectlogger"/>
+        
+        <component class="com.redn.connect.processor.utils.ComputeIdocSize" doc:name="cumpute-file-size"/>
+        <choice doc:name="Check-Idoc-Size">
+            <when expression="#[message.outboundProperties['isIdocHuge'] == true]">
+                 <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="out of message fron sap2conect after computed Size#[payload]" processState="102017150" doc:name="Connectlogger"/>
+               
+                <file:outbound-endpoint responseTimeout="10000" doc:name="writing-Idoc-to-File" path="${connect.sap2connect.idoc.hugefile.location}" connector-ref="File_Config"/>
+            </when>
+            <otherwise>
+                  <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Enterprise message after checking file size from sap2connect #[payload]" processState="102017160" doc:name="Connectlogger"/>
+            </otherwise>
+        </choice>
+        <component class="com.redn.connect.processor.CreateEnterpriseMessage" doc:name="Construct-EnterpriseMessage"/>
+        <enricher doc:name="Message Enricher" target="#[flowVars.logCEM]">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102017960" doc:name="Connectlogger-Log CEM"/>
+        </enricher>
+        <message-properties-transformer doc:name="Set-flage-posted-to-apigateway">
+            <add-message-property key="postedToAPIGateway" value="true"/>
+        </message-properties-transformer>
+        <!-- <exception-strategy ref="Choice_Exception_Strategy" doc:name="Reference Exception Strategy"/> -->
+    </sub-flow>
+   
+      <sub-flow name="receiveCEMAndSendToApiManager">
+        <!-- <vm:inbound-endpoint exchange-pattern="one-way"  doc:name="Enterprisemessage-to-apigateway" path="${sap2connect.vm.route.idoc.for.em.sender}"/> -->
+
+        <set-variable variableName="#[SAP2ConnectConstants.VAR_ENTERPRISE_MESSAGE]" value="#[payload]" doc:name="Set-Enterprise-Message"/>
+        <set-property propertyName="content-type" value="text/xml" doc:name="set message type"/>
+	<!-- <until-successful maxRetries="${connect.sap2connect.apigateway.maxRetry.interval}" doc:name="Until Successful" failureExpression="#[header:INBOUND:http.status != 200]" millisBetweenRetries="${sap2connect.apigateway.maxRetries}" objectStore-ref="ObjectStoreName">
+            <processor-chain doc:name="Processor Chain"> -->
+                <set-payload value="#[flowVars[SAP2ConnectConstants.VAR_ENTERPRISE_MESSAGE]]" doc:name="Set Payload-to-enterpriseMessage"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: Sending CEM request to apigateway ::" processState="102017170" doc:name="Connectlogger"/>
+                <http:request config-ref="HTTP_Request_Configuration" path="${connect.sap2connect.apimanager.path}" method="POST" doc:name="apiGateway"/>
+
+         <!--    </processor-chain>
+        </until-successful> -->
+
+       <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: CEM sent successfully to API Manager ::" processState="204017180" doc:name="Connectlogger"/>
+
+        <choice doc:name="verify-http-satus">
+        <when expression="#[message.inboundProperties.'http.status' ==200]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage=":: sap2connect message processing completed successfully and sent to NS topic ::" processState="204017190" doc:name="Connectlogger"/>
+            </when>
+  
+             <otherwise>
+              
+
+			<scripting:component doc:name="connect exception-Error">
+    <scripting:script engine="Groovy"><![CDATA[import com.redn.connect.exception.ConnectException;
+import com.redn.connect.exception.Category;
+import com.redn.connect.sap2connect.common.constants.SAP2ConnectConstants;
+import com.redn.connect.constants.ConnectConstants;
+
+throw new ConnectException(SAP2ConnectConstants.ERROR_CODE_FILE_SIZE,SAP2ConnectConstants.ERROR_DESCRIPTION_FILE_SIZE,Category.COMM, ConnectConstants.CONST_EXCEPTION_ORIGIN_MULE_API_MANAGER);
+    ]]></scripting:script>
+</scripting:component>
+
+               <!--  <scripting:component doc:name="throws-exception">
+                    <scripting:script engine="Groovy"><![CDATA[throw new ConnectException([flowVars[ConnectConstants.VAR_ERROR_CODE]],[flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]],[flowVars[ConnectConstants.VAR_ERROR_CATEGORY]],[flowVars[ConnectConstants.VAR_ERROR_ORIGIN]]);
+]]></scripting:script>
+                </scripting:component>    -->
+            </otherwise>
+        </choice>
+		<!-- <exception-strategy ref="globle_Exception_Strategy"
+			doc:name="Reference Exception Strategy" /> -->
+    </sub-flow>
+
+    <!-- 
+    <flow name="sap2connectgatewayconfigFlow">
+        <poll doc:name="Poll">
+            <component class="com.redn.connect.processor.CreateEnterpriseException" doc:name="Create-EnterpriseException-Message"/>
+        </poll>
+        <jms:outbound-endpoint queue="${sap2connect.exception.handler.global.queueName}" connector-ref="Active_MQ" doc:name="JMS-sendTo-GlobalException"/>
+        <logger message="exception output #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    -->
+ 
+</mule>

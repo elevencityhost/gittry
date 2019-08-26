@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:sap="http://www.mulesoft.org/schema/mule/sap"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+<jms:activemq-connector name="SapGWActiveMQConn"
+		username="${connect.sapgw.services.activemq.user}" 
+		password="${connect.sapgw.services.activemq.password}"
+		brokerURL="${connect.sapgw.services.activemq.url}" validateConnections="true"
+		doc:name="Active MQ Global Connector" numberOfConsumers="${connect.sapgw.services.activemq.consumers}" persistentDelivery="true" specification="1.1">
+        <reconnect-forever frequency="${connect.sapgw.services.activemq.frequency}"/>
+        <service-overrides sessionHandler="org.mule.session.NullSessionHandler"/>
+    </jms:activemq-connector>
+
+<connectlogger:config name="ConnectloggerDistributionConn" loggerName="connect-sapgw-services-logger" doc:name="Connectlogger: Configuration"/>
+   <sap:connector name="SAPServicesConn" jcoAsHost="${connect.sapgw.sapinstance.services.host}" jcoUser="${connect.sapgw.sapinstance.services.user}" jcoPasswd="${connect.sapgw.sapinstance.services.password}" jcoSysnr="${connect.sapgw.sapinstance.services.systemnumber}" jcoClient="${connect.sapgw.sapinstance.systemnumber.services.client}" validateConnections="true" 
+   jcoPeakLimit="${connect.sapgw.services.jco.peaklimit}" 
+		jcoPoolCapacity="${connect.sapgw.services.jco.poolcapacity}" 
+		jcoExpirationTime="${connect.sapgw.services.jco.expirationtime}" doc:name="SAP"/>
+</mule>

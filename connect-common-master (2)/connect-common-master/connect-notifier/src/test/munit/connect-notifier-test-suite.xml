@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+	<munit:config name="munit" doc:name="MUnit configuration"
+		mock-connectors="false" />
+	<spring:beans>
+		<spring:import resource="classpath:connect-notifier.xml" />
+		<spring:import resource="classpath:exception-handler.xml" />
+		<spring:import resource="classpath:global_configurations.xml" />
+		<spring:import resource="classpath:global_connectors.xml" />
+	</spring:beans>
+	<munit:test name="test-connect-notifier-success-payload"
+		description="Test">
+		<mock:when messageProcessor=".*:.*"
+			doc:name="Mock JMS - Send CEM To EmailService Queue">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['JMS - Send To Email Service Queue']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]"/>
+
+		</mock:when>
+		<mock:when messageProcessor=".*:.*"
+			doc:name="Mock - Log Final Logger Component Message">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['Connectlogger - Log EmailMessage Sent To EmailService']" />
+			</mock:with-attributes>
+			<mock:then-return
+				payload="========== SUCCESS CEM Sent To Email Service Queue ============"
+				mimeType="text/plain" />
+		</mock:when>
+		<set-payload
+			value="{
+
+	&quot;commonAttributesMessage&quot;:{
+	
+		&quot;applicationID&quot;:&quot;redington&quot;,
+     &quot;requestID&quot;:&quot;SAIPRASAD1234&quot;
+	},
+     
+	
+	 &quot;emailMessage&quot;:{	   
+	    &quot;toList&quot;:[&quot;saiprasad.jonnala@invenio-solutions.com&quot;,&quot;shruthi.kolloju@invenio-solutions.com&quot;],
+	    &quot;ccList&quot;:[&quot;ssas&quot;],
+	    &quot;bccList&quot;:[],
+	    &quot;replyTo&quot;:&quot;testemailredington@r-exchange.net&quot;,
+        &quot;subject&quot;:&quot;Notification Message Email Subject&quot;,
+	    &quot;body&quot;:&quot;&quot;,
+		&quot;templateID&quot;:&quot;index&quot;,
+		&quot;keyValuePairs&quot;:{
+        	&quot;&lt;serialnumber&gt;&quot;:&quot;123456&quot;,
+        	&quot;&lt;jobcardnumber&gt;&quot;:&quot;JOB123456&quot;
+        },
+        &quot;attachments&quot;:[&quot;attachmentpath1&quot;,&quot;attachmentpath2&quot;,&quot;attachmentpath3&quot;]
+	}
+}
+"
+			mimeType="application/json" doc:name="Set Notification Message Payload" />
+		<component class="com.redn.connect.notifier.test.TestPrepareCEM"
+			doc:name="Java - Prepare Test CEM" />
+		<flow-ref name="connect-notifierFlow" doc:name="connect-notifierFlow" />
+		<munit:assert-on-equals message="CEM NOT SENT TO EMAIL SERVICE QUEUE"
+			expectedValue="Email Sent Successfully To EmailService Queue !!!"
+			actualValue="#[payload]" doc:name="Assert Equals - Check Log Executed" />
+	</munit:test>
+
+
+	<munit:test description="test-connect-notifier-failure-payload"
+		name="test-connect-notifier-failure-payload">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEE Queue">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['JMS CEH Queue']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="Message Sent To CEH !!!" mimeType="text/plain"/>
+		</mock:when>
+		<set-payload value="SAMPLE TEXT" mimeType="text/plain"
+			doc:name="Set Text Payload" />
+		<flow-ref name="connect-notifierFlow" doc:name="connect-notifierFlow" />
+        <set-variable variableName="expectedPayload" value="{&quot;requestID&quot;:&quot;&quot;,&quot;applicationID&quot;:&quot;&quot;,&quot;emailMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Enterprise Message Validation failed&quot;,&quot;status&quot;:null},&quot;smsMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Enterprise Message Validation failed&quot;,&quot;status&quot;:null,&quot;messageIDs&quot;:&quot;&quot;}}" mimeType="application/json" doc:name="Variable - Expected Payload"/>
+		<munit:assert-on-equals message="Payload is not an instance of CEE"
+			expectedValue="#[flowVars.expectedPayload]"
+			actualValue="#[payload]"
+			doc:name="Assert Equals - Check CEE Queue Called" />
+
+	</munit:test>
+
+	<munit:test name="test-connect-notifier-missing-applicationid-payload"
+		description="Missing Application ID in received Payload Content !!">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEE Queue">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name" whereValue="#['JMS CEH Queue']" />
+			</mock:with-attributes>
+			<mock:then-return payload="CEE Queue Is Called !!!!"
+				mimeType="text/plain" />
+		</mock:when>
+		<set-payload
+			value="{
+  &quot;commonAttributesMessage&quot; : {
+    &quot;requestID&quot; : &quot;SAIPRASAD1234&quot;,
+    &quot;applicationID&quot; : &quot;&quot;
+  },
+  &quot;emailMessage&quot; : {
+    &quot;keyValuePairs&quot; : {
+      &quot;&lt;serialnumber&gt;&quot; : &quot;123456&quot;,
+      &quot;&lt;jobcardnumber&gt;&quot; : &quot;JOB123456&quot;
+    },
+    &quot;commonAttributesMessage&quot; : {
+      &quot;requestID&quot; : &quot;SAIPRASAD1234&quot;,
+      &quot;applicationID&quot; : &quot;redington&quot;
+    },
+    &quot;body&quot; : &quot;&quot;,
+    &quot;templateID&quot; : &quot;index&quot;,
+    &quot;replyTo&quot; : &quot;testemailredington@r-exchange.net&quot;,
+    &quot;subject&quot; : &quot;Notification Message Email Subject&quot;,
+    &quot;ccList&quot; : [ &quot;ssas&quot; ],
+    &quot;toList&quot; : [ &quot;saiprasad.jonnala@invenio-solutions.com&quot;, &quot;shruthi.kolloju@invenio-solutions.com&quot; ],
+    &quot;bccList&quot; : [ ],
+    &quot;attachments&quot; : [ &quot;attachmentpath1&quot;, &quot;attachmentpath2&quot;, &quot;attachmentpath3&quot; ],
+    &quot;emailMessage&quot; : null
+  }
+}"
+			mimeType="application/json" doc:name="Set Payload With Missing APPLICATION ID" />
+		<component
+			class="com.redn.connect.notifier.test.TestPrepareCEMWithMissingServiceName"
+			doc:name="Java - Prepare Test CEM" />
+		<flow-ref name="connect-notifierFlow" doc:name="connect-notifierFlow" />
+        <set-variable variableName="expectedPayload" value="{&quot;requestID&quot;:&quot;&quot;,&quot;applicationID&quot;:&quot;&quot;,&quot;emailMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Application ID is unavailable in received request &quot;,&quot;status&quot;:null},&quot;smsMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Application ID is unavailable in received request &quot;,&quot;status&quot;:null,&quot;messageIDs&quot;:&quot;&quot;}}" mimeType="application/json" doc:name="Variable - Expected Payload "/>
+		<munit:assert-on-equals message="payload is not an instance of CEE"
+			expectedValue="#[flowVars.expectedPayload]"
+			actualValue="#[payload]"
+			doc:name="Assert Equals - Check CEE Queue Called For Missing Application ID" />
+
+	</munit:test>
+
+	<munit:test name="test-connect-notifier-missing-serviceName-payload"
+		description="Missing Application ID in received Payload Content !!">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEE Queue">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name" whereValue="#['JMS CEH Queue']" />
+			</mock:with-attributes>
+			<mock:then-return payload="CEE Queue Is Called !!!!"
+				mimeType="text/plain" />
+		</mock:when>
+		<set-payload
+			value="{  &quot;emailMessage&quot;:{   &quot;applicationID&quot;:&quot;redington&quot;,      &quot;requestID&quot;:&quot;SAIPRASAD1234&quot;,      &quot;toList&quot;:[],      &quot;ccList&quot;:[&quot;ssas&quot;],      &quot;bccList&quot;:[],      &quot;replyTo&quot;:&quot;testemailredington@r-exchange.net&quot;,         &quot;subject&quot;:&quot;Notification Message Email Subject&quot;,      &quot;body&quot;:&quot;&quot;,   &quot;templateID&quot;:&quot;index&quot;,   &quot;keyValuePairs&quot;:{          &quot;&lt;serialnumber&gt;&quot;:&quot;123456&quot;,          &quot;&lt;jobcardnumber&gt;&quot;:&quot;JOB123456&quot;         },         &quot;attachments&quot;:[&quot;attachmentpath1&quot;,&quot;attachmentpath2&quot;,&quot;attachmentpath3&quot;]  } } "
+			mimeType="application/json" doc:name="Set Payload With Missing ToList" />
+		<component
+			class="com.redn.connect.notifier.test.TestPrepareCEMWithMissingServiceName"
+			doc:name="Java - Prepare Test CEM Without ServiceName" />
+		<flow-ref name="connect-notifierFlow" doc:name="connect-notifierFlow" />
+        <set-variable variableName="expectedPayload" value="{&quot;requestID&quot;:&quot;&quot;,&quot;applicationID&quot;:&quot;&quot;,&quot;emailMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Unrecognized field \&quot;applicationID\&quot; (Class com.redn.connect.notifications.request.EmailMessage), not marked as ignorable\n at [Source: java.io.StringReader@782e6b40; line: 1, column: 40] (through reference chain: com.redn.connect.notifications.request.NotificationMessage[\&quot;emailMessage\&quot;]-&gt;com.redn.connect.notifications.request.EmailMessage[\&quot;applicationID\&quot;])&quot;,&quot;status&quot;:null},&quot;smsMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Unrecognized field \&quot;applicationID\&quot; (Class com.redn.connect.notifications.request.EmailMessage), not marked as ignorable\n at [Source: java.io.StringReader@782e6b40; line: 1, column: 40] (through reference chain: com.redn.connect.notifications.request.NotificationMessage[\&quot;emailMessage\&quot;]-&gt;com.redn.connect.notifications.request.EmailMessage[\&quot;applicationID\&quot;])&quot;,&quot;status&quot;:null,&quot;messageIDs&quot;:&quot;&quot;}}" mimeType="application/json" doc:name="Variable - Expected Payload"/>
+		<munit:assert-on-equals message="payload is not an instance of CEE"
+			expectedValue="#[flowVars.expectedPayload]"
+			actualValue="#[payload]"
+			doc:name="Assert Equals - Check CEE Queue Called For Missing ServiceName" />
+	</munit:test>
+
+	<munit:test description="test-connect-notifier-missing-templatefile-payload"
+		name="test-connect-notifier-missing-templatefile-payload">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEE Queue">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name" whereValue="#['JMS CEH Queue']" />
+			</mock:with-attributes>
+			<mock:then-return payload="#[]" />
+		</mock:when>
+		<set-payload
+			value="{
+  &quot;commonAttributesMessage&quot; : {
+    &quot;requestID&quot; : &quot;SAIPRASAD1234&quot;,
+    &quot;applicationID&quot; : &quot;redington&quot;
+  },
+  &quot;emailMessage&quot; : {
+    &quot;keyValuePairs&quot; : {
+      &quot;&lt;serialnumber&gt;&quot; : &quot;123456&quot;,
+      &quot;&lt;jobcardnumber&gt;&quot; : &quot;JOB123456&quot;
+    },
+    &quot;commonAttributesMessage&quot; : {
+      &quot;requestID&quot; : &quot;SAIPRASAD1234&quot;,
+      &quot;applicationID&quot; : &quot;redington&quot;
+    },
+    &quot;body&quot; : &quot;&quot;,
+    &quot;templateID&quot; : &quot;index123&quot;,
+    &quot;replyTo&quot; : &quot;testemailredington@r-exchange.net&quot;,
+    &quot;subject&quot; : &quot;Notification Message Email Subject&quot;,
+    &quot;ccList&quot; : [ &quot;ssas&quot; ],
+    &quot;toList&quot; : [ &quot;saiprasad.jonnala@invenio-solutions.com&quot;, &quot;shruthi.kolloju@invenio-solutions.com&quot; ],
+    &quot;bccList&quot; : [ ],
+    &quot;attachments&quot; : [ &quot;attachmentpath1&quot;, &quot;attachmentpath2&quot;, &quot;attachmentpath3&quot; ],
+    &quot;emailMessage&quot; : null
+  }
+}"
+			doc:name="Set Payload With Wrong Template ID" />
+		<component class="com.redn.connect.notifier.test.TestPrepareCEM"
+			doc:name="Java - Prepare CEM With  Payload" />
+		<flow-ref name="connect-notifierFlow" doc:name="connect-notifierFlow" />
+        <set-variable variableName="expectedPayload" value="{&quot;requestID&quot;:&quot;&quot;,&quot;applicationID&quot;:&quot;&quot;,&quot;emailMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Template File unavailable in location &quot;,&quot;status&quot;:null},&quot;smsMessageResponse&quot;:{&quot;responseCode&quot;:&quot;400&quot;,&quot;responseDescription&quot;:&quot;Template File unavailable in location &quot;,&quot;status&quot;:null,&quot;messageIDs&quot;:&quot;&quot;}}" mimeType="application/json" doc:name="Variable expected payload"/>
+		<munit:assert-on-equals message="payload is not an instance of CEE"
+			expectedValue="#[flowVars.expectedPayload]"
+			actualValue="#[payload]"
+			doc:name="Assert Equals - Check CEE Queue Called For Missing Application ID" />
+	</munit:test>
+
+	<munit:test description="test-connect-notifier-with-notificationmessageobj-payload"
+		name="test-connect-notifier-with-notificationmessageobj-payload">
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - JMS CEE Queue">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name" whereValue="#['JMS CEE Queue']" />
+			</mock:with-attributes>
+			<mock:then-return payload="#[payload]" />
+		</mock:when>
+		<mock:when messageProcessor=".*:.*" doc:name="Mock - Email Service Queue">
+			<mock:with-attributes>
+				<mock:with-attribute name="doc:name"
+					whereValue="#['JMS - Send To Email Service Queue']" />
+			</mock:with-attributes>
+			<mock:then-return payload="#[]" />
+		</mock:when>
+		<component
+			class="com.redn.connect.notifier.test.TestPrepareCEMWithNotificationMessageObj"
+			doc:name="Java - Prepare CEM For Test With NotificationMessageObj" />
+		<flow-ref name="connect-notifierFlow" doc:name="connect-notifierFlow" />
+        <set-variable variableName="expectedPayload" value="{&quot;requestID&quot;:&quot;request1234&quot;,&quot;applicationID&quot;:&quot;redington&quot;,&quot;emailMessageResponse&quot;:{&quot;responseCode&quot;:&quot;200&quot;,&quot;responseDescription&quot;:&quot;Email sent successfully !!!&quot;,&quot;status&quot;:&quot;SUCCESS&quot;},&quot;smsMessageResponse&quot;:{&quot;responseCode&quot;:null,&quot;responseDescription&quot;:null,&quot;status&quot;:null,&quot;messageIDs&quot;:null}}" mimeType="application/json" doc:name="Variable - Expected Payload"/>
+		<munit:assert-on-equals message="payload is not an instance of CEM"
+			expectedValue="#[flowVars.expectedPayload]"
+			actualValue="#[payload]"
+			doc:name="Assert Equals - Check emailservice Queue Called" />
+	</munit:test>
+
+
+</mule>

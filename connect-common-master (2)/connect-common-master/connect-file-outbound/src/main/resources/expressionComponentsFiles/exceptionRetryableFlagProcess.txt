@@ -1,0 +1,7 @@
+if(exception != null){
+ 	if(exception.getCause().getMessage().contains("not ftped to all destinations") 
+ 			|| exception.getCause().getMessage().contains("Archiving source file is failed.")
+ 			|| exception.getCause().getMessage().contains("'.error' file is failed")){
+		flowVars.retryableFlag = true;
+	}
+}

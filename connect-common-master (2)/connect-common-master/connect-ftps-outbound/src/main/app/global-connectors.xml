@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+	<jms:activemq-connector name="activeMQGlblConn"
+		username="${connect.ftps.outbound.activemq.username}" password="${connect.ftps.outbound.activemq.password}"
+		brokerURL="${connect.ftps.outbound.activemq.url}" validateConnections="true"
+		doc:name="Active MQ Global Connector" numberOfConsumers="${connect.ftps.outbound.activemq.numberOfConsumers}"
+		persistentDelivery="true" specification="1.1">
+		<reconnect-forever
+			frequency="${connect.ftps.outbound.activemq.reconnect.frequency}"
+			blocking="false" />
+		<service-overrides sessionHandler="org.mule.session.NullSessionHandler" />
+	</jms:activemq-connector>
+
+	<connectlogger:config name="Connectlogger__Configuration"
+		loggerName="connect-ftps-outbound-logger" doc:name="Connectlogger: Configuration" />
+
+</mule>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="Connect_httpOutbound_logger" doc:name="Connectlogger: Configuration"/>
+    <mulexml:jaxb-context name="JAXB_Context" packageNames="com.redn.connect.vo" doc:name="JAXB Context"/>
+    <http:request-config name="HTTP_Request_Configuration" host="#[flowVars.httpDetails.getHost()]" port="#[flowVars.httpDetails.getPort()]" basePath="#[flowVars.httpDetails.getBasePath()]" doc:name="HTTP Request Configuration"/>
+    <expression-filter expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]" name="Expression" doc:name="Expression"/>
+    <flow name="connect-http-api-outboundFlow" processingStrategy="synchronous">
+        <jms:inbound-endpoint queue="${connect.http.api.outbound.jms.queue}" connector-ref="activeMQGlblConn" doc:name="JMS" exchange-pattern="request-response" responseTimeout="30000">
+        <!-- <jms:selector expression="${connect.http.outbound.jms.topic.messageSelectorKey}" /> -->
+        </jms:inbound-endpoint>
+ 
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="HttpOutbound interface triggered" processState="102024100" doc:name="Connectlogger-HttpOutbound triggered"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="payload is instance of cem" processState="102024101" doc:name="Connectlogger-payload is instance of CEM"/>
+            </when>
+
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received payload as xml" processState="102024104" doc:name="Connectlogger-payload as XML"/>
+                <mulexml:jaxb-xml-to-object-transformer jaxbContext-ref="JAXB_Context" doc:name="XML to JAXB Object"/>
+            </otherwise>
+        </choice>
+        <response>
+            <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        </response>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]--------CEM" processState="102024105" doc:name="Connectlogger-CEM"/>
+
+        <filter ref="Expression" doc:name="Validate CEM"/>
+        <expression-component doc:name="Expression"><![CDATA[flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_SOURCE_SYSTEM]= payload.getEnterpriseHeader().getSourceSystem();
+flowVars[ConnectConstants.VAR_COMMUNICATION]= payload.getEnterpriseHeader().getCommunication();
+flowVars[ConnectConstants.VAR_PRIORITY]= payload.getEnterpriseHeader().getPriority();
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE] = payload;
+payload.getEnterpriseHeader().setComponent("connect-http-api-outboundFlow");]]></expression-component>
+        <component doc:name="Java- ExtractPayload">
+            <spring-object bean="springExtractPayloadBean"/>
+        </component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="payload extracted   #[payload]" processState="102024106" doc:name="Connectlogger-payload"/>
+
+        <json:json-to-object-transformer returnClass="com.redn.connect.vo.HTTPDetailsVo" mimeType="application/java" doc:name="JSON to HTTPDetailsVo"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Conversion of JSON to HTTPDetailsVo is done successfully" processState="102024107" doc:name="Connectlogger-Conversion of JSON to HTTPDetailsVo "/>
+        <flow-ref name="connect-http-outbound-SendtoHTTP" doc:name="connect-http-outbound-SendtoHTTP"/>
+        <exception-strategy ref="connectHTTP_API_outbound_ExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="connect-http-outbound-SendtoHTTP" processingStrategy="synchronous">
+        <component class="com.redn.connect.processor.ExtractFileAndHttpDetails" doc:name="Java- ExtractFileAndHttpDetails"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="CEM with http details :   Host : #[flowVars.httpDetails.getHost()], Port: #[flowVars.httpDetails.getPort()], basePath: #[flowVars.httpDetails.getBasePath()], Path: #[flowVars.httpDetails.getPath()], Method: #[flowVars.httpDetails.getMethod()], Headers: #[flowVars.httpDetails.getHeaders()], QueryParams: #[flowVars.httpDetails.getQueryParams()], UriParams: #[flowVars.httpDetails.getUriParams()]" processState="102024108" doc:name="Connectlogger-CEM with http details"/>
+
+        <http:request config-ref="HTTP_Request_Configuration" path="#[flowVars.httpDetails.getPath()]" method="#[flowVars.httpDetails.getMethod()]" doc:name="HTTP_Request_Configuration">
+            <http:request-builder>
+                <http:query-params expression="#[flowVars.httpDetails.getQueryParams()]"/>
+                <http:uri-params expression="#[flowVars.httpDetails.getUriParams()]"/>
+                <http:headers expression="#[flowVars.httpDetails.getHeaders()]"/>
+
+
+
+            </http:request-builder>
+        </http:request>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Message sent successfully to HTTP" processState="102024110" doc:name="Connectlogger-Message sent successfully to HTTP"/>
+          <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <flow-ref name="subRetriableFlow" doc:name="subRetriableFlow"/>
+
+       	</catch-exception-strategy>
+    </flow>
+     <sub-flow name="subRetriableFlow">
+        <expression-component doc:name="set Exception Properties"><![CDATA[flowVars[ConnectConstants.VAR_ERROR_CODE]=HTTPOutboundConstants.ERROR_HTTP_COMMUNICATION;
+flowVars[ConnectConstants.VAR_ERROR_DESCRIPTION]="Error in communicating with HTTP: " +  exception.getCauseException().getMessage();
+flowVars[ConnectConstants.VAR_ERROR_CATEGORY]=Category.COMM;
+flowVars[ConnectConstants.VAR_ERROR_ORIGIN]=HTTPOutboundConstants.CONST_EXCEPTION_ORIGIN_HTTP;
+flowVars[ConnectConstants.VAR_RETRYABLE]=true;
+]]></expression-component>
+        <flow-ref name="subPrepareEEandSendToCEHflow" doc:name="subPrepareEEandSendToCEHflow"/>
+    </sub-flow>
+</mule>

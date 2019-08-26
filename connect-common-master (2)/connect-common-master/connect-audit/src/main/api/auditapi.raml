@@ -1,0 +1,163 @@
+#%RAML 0.8
+title: audit
+version: v1.0
+baseUri: http://localhost:18084/{title}
+/audit:
+    get:
+      description: Lookup Audit Messages
+      queryParameters:
+        job_id:       
+          displayName: jobId   
+          type: string
+          required: true          
+      responses:
+        200:
+          description: Audit response details
+          body:
+            application/json:
+              schema: !include schemas/AuditGetResponse.json
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+              
+    post:
+      description: Add audit entry
+      body:
+        application/json:
+          schema: !include schemas/AuditPostRequest.json
+      responses:
+        200:
+          description: Audit message successfully posted.
+          body:
+            application/json: 
+              schema: !include schemas/StatusResponse.json
+        400:
+          description: Bad request
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json    
+              
+/verify:
+    get:
+      description: Get verify status
+      queryParameters:
+        job_id:
+          displayName: jobId
+          type: string
+          required: true
+          description: Job unique ID
+        interface_id:
+          displayName: interfaceId
+          type: string
+          required: true
+          description: Interface ID
+        system_id:
+          displayName: systemId
+          type: string
+          required: true
+          description: System ID
+        props:
+          displayName: comma seperated properties to be verified
+          type: string
+          required: true
+          description: properties to be verified
+      responses:
+        200:
+          description: Output count successfully retrieved
+          body:
+            application/json:
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+
+    put:
+      description: Verify Audit Messages
+      body:
+        application/json:
+          schema: !include schemas/AuditPutRequest.json 
+      responses:
+        200:
+          description: Audit message successfully verified.
+          body:
+            application/json:
+              schema: !include schemas/AuditPutResponse.json
+        400:
+          description: Bad request
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json 
+            
+/validate:
+    get:
+      description: Get output count property value
+      queryParameters:
+        job_id:
+          displayName: jobId
+          type: string
+          required: true
+          description: unique id
+        interface_id:
+          displayName: interfaceId
+          type: string
+          required: true
+          description: interface id
+      responses:
+        200:
+          description: Output count successfully retrieved
+          body:
+            application/json:
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+            
+    put:
+      description: Validate Audit Messages
+      body:
+        application/json:
+          schema: !include schemas/ValidationPutRequest.json
+      responses:
+        200:
+          description: Audit message successfully validated.
+          body:
+            application/json:
+              schema: !include schemas/ValidationPutResponse.json
+        400:
+          description: Bad request
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+                
+/generate-uid:
+    get:
+      responses:
+        200:
+          description: UID generated successfully
+          body:
+            application/json:
+        500:
+          description: Enterprise Exception occurred
+          body:
+            application/json:
+              schema: !include schemas/EnterpriseException.json
+                                                    

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns2:ConnectEnterpriseMessage xmlns:ns2="http://schemas.connect.com/enterprise/services/2016/11" xmlns="http://schemas.connect.com/enterprise/services/2016/11">
+   <ns2:EnterpriseHeader>
+      <ns2:MessageId>a1a0d517-bf6c-4c44-94ed-2fc3df20ab06</ns2:MessageId>
+      <ns2:CreatedUtc>2016-12-01T15:45:05.845+05:30</ns2:CreatedUtc>
+      <ns2:SourceSystem>LENOVO</ns2:SourceSystem>
+      <ns2:TargetSystem />
+      <ns2:PartnerId />
+      <ns2:ServiceName />
+	  <ns2:MessageSource>E:\Backup\RCI\Basicstuff\Files\input\LEN005.txt</ns2:MessageSource>
+      <ns2:Action>AS2</ns2:Action>
+      <ns2:Priority>5</ns2:Priority>
+	  	<ns2:Custom>
+         <ns2:CustomProps>
+            <ns2:contents>
+               <ns2:Name>interface</ns2:Name>
+               <ns2:Value>LEN005_usr_pwd</ns2:Value>
+            </ns2:contents>
+            <ns2:contents>
+               <ns2:Name>protocol</ns2:Name>
+               <ns2:Value>ftp</ns2:Value>
+            </ns2:contents>
+         </ns2:CustomProps>
+      </ns2:Custom>
+   </ns2:EnterpriseHeader>
+   <ns2:EnterpriseBody>
+      <payload xmlns="" xmlns:ns3="http://schemas.connect.com/enterprise/services/2016/11" xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">I am beside expert</payload>
+   </ns2:EnterpriseBody>
+</ns2:ConnectEnterpriseMessage>

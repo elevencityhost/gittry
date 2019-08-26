@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd">
+    <flow name="samsungftpinboundFlow">
+        <quartz:inbound-endpoint jobName="Quartz2" cronExpression="${connect.sam002.cron.expr}" repeatInterval="0" responseTimeout="10000" doc:name="Quartz2">
+            <quartz:event-generator-job/>
+        </quartz:inbound-endpoint>
+        <set-variable variableName="source" value="sam002" doc:name="source"/>
+        <flow-ref name="connect-ftp-inboundsSub_Flow" doc:name="connect-ftp-inboundsSub_Flow"/>
+       <choice doc:name="Choice">
+            <when expression="#[null != payload.getEnterpriseHeader().getCustom()]">
+                <jms:outbound-endpoint queue="${connect.ftpinb.sam002.queue}" connector-ref="activeMQGlblConn" doc:name="sam002Queue"/>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="CEM sent to samsung queue" processState="102022102" doc:name="Connectlogger"/>
+
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Custom property with Var Attachment path is empty" processState="102022120" doc:name="Connectlogger"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="mainFTPInboundflowChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+</mule>

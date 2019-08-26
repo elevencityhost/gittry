@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:enterpriselogger="http://www.mulesoft.org/schema/mule/enterpriselogger"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/enterpriselogger http://www.mulesoft.org/schema/mule/enterpriselogger/current/mule-enterpriselogger.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    <connectlogger:config name="Connectlogger__Configuration" loggerName="connect-as2-logger" doc:name="Connectlogger: Configuration"/>
+    <flow name="mainConnectAS2Sendflow" doc:description="This flow receives AS2 message from the topic, derives the target system, extracts the payload from CEM, backup the content and calls the target system send flow">
+    	<jms:inbound-endpoint queue="${connect.as2.jms.virtual.dl.topic.consumer}"
+			connector-ref="activeMQGlblConn" doc:name="topic-message-inbound-connect-as2"
+			doc:description="JMS inbound endpoint to receive messages">
+            <jms:transaction action="ALWAYS_BEGIN"/>
+			<jms:selector expression="${connect.as2.jms.topic.messageSelectorKey}" />
+		</jms:inbound-endpoint>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="connect-as2 outbound received message " processState="102009200" doc:name="Log - Message Received"/>
+		 <choice doc:name="Check Payload Type">
+        	<when expression="#[payload instanceof java.lang.String  &amp;&amp;  null != payload]">
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received java.lang.String  As Payload Converting To CEM Object" processState="102009201" doc:name="Connectlogger-Log"/>
+                <set-payload value="#[ConnectUtils.jaxbXMLToCEMObject(payload)]" doc:name="Set CEM Object As Payload"/>
+        	</when>
+        	<otherwise>
+                <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received payload is not an instance of string" processState="102009201" doc:name="Connectlogger"/>
+        	</otherwise>
+        </choice>
+		<message-filter throwOnUnaccepted="true" doc:name="validate enterprise Message">
+            <expression-filter expression="#[payload instanceof com.redn.connect.vo.ConnectEnterpriseMessage]"/>
+        </message-filter>
+        <flow-ref name="subCaptureEnterpriseDetailsSendFlow" doc:name="subCaptureEnterpriseDetailsSendFlow" doc:description="calls captureEnterpriseDetailsFlow"/>        <enricher doc:name="Message Enricher" target="#[flowVars.logCEM]">
+            <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102009960" doc:name="Connectlogger-log-CEM"/>
+
+        </enricher>
+
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="connect-as2 message processing started for outbound" processState="102009201" doc:name="Log - Started Processing"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Received Connect Enterprise Message to Connect AS2 Delivery Queue with Message ID: #[flowVars[ConnectConstants.VAR_MESSAGE_ID]]" processState="102009202" doc:name="Log - Message ID"/>
+        <component doc:name="validate and build target system flow" doc:description="validates the target system and builds target system flow to send">
+            <spring-object bean="springValidateAndBuildTargetSystemFlowProcessorBean"/>
+        </component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Target System is: #[flowVars[AS2Constants.VAR_TARGET_SYSTEM]]" processState="102009210" doc:name="Log - Target System"/>
+        <component doc:name="extract payload" doc:description="extarcts payload from cem">
+            <spring-object bean="springExtractPayloadProcessorBean"/>
+        </component>
+        <flow-ref name="subSendContentBackUpToFileFlow" doc:name="flowRefSubSendContentBackUpToFileFlow" doc:description="calls subSendContentBackUpToFileFlow"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Calling Send to target system flow: #[flowVars[AS2Constants.VAR_TARGET_SYSTEM_SEND_FLOW]]" processState="102009220" doc:name="Log - Calling Target System Flow"/>
+      	<flow-ref name="#[flowVars[AS2Constants.VAR_TARGET_SYSTEM_SEND_FLOW]]" doc:name="flowRefTargetSendFlow" doc:description="calls the target system send flow"/>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="connect-as2 message processing completed for outbound" processState="200009250" doc:name="Log - Completed Processing"/>
+        <exception-strategy ref="globalChoiceExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    
+    <sub-flow name="subCaptureEnterpriseDetailsSendFlow"  doc:description="this flow captures enterprise message details">
+        <set-variable variableName="#[ConnectConstants.VAR_ENTERPRISE_MESSAGE]" value="#[payload]" doc:name="store enterpriseMessage" doc:description="store enterpriseMessage for later use"/>
+        <expression-component doc:name="captureMessageProperties" doc:description="captures message properties "><![CDATA[flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[AS2Constants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+
+payload.getEnterpriseHeader().setComponent("connect-as2-send");
+
+
+
+
+]]></expression-component>
+        <component doc:name="Java-Extract RefNum And Partner ID From CEM Properties">
+            <spring-object bean="springExtractCEMPropertiesBeanId"/>
+        </component>
+    </sub-flow>
+    
+    <sub-flow name="subSendContentBackUpToFileFlow" doc:description="this flow sets the backup file properties and calls writeToFile flow">
+        <expression-component doc:name="Set Backup file properties"><![CDATA[flowVars[AS2Constants.VAR_DIRECTION]=AS2Constants.CONST_DIRECTION_OUTBOUND;
+flowVars[AS2Constants.VAR_BACKUP_FOLDER]='${connect.as2.backup.folder.outbound}';
+flowVars[AS2Constants.VAR_BACKUP_FILE_PREFIX]=message.inboundProperties[AS2Constants.VAR_SERVICE_NAME];
+]]></expression-component>
+        <flow-ref name="subWriteToFile" doc:name="subWriteToFile"/>
+    </sub-flow>
+    <sub-flow name="subValidateResponseFromTargetSystem" doc:description="this flow validates the response from target system">
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <connectlogger:debug config-ref="Connectlogger__Configuration" logMessage="Response From #[flowVars[AS2Constants.VAR_TARGET_SYSTEM]]  is ::  #[payload]" processState="200009231" doc:name="Debug Log - Full Response from Target System"/>
+        <component doc:name="validate response" doc:description="validates the response from target system">
+            <spring-object bean="springValidateResponseFromTargetSystemProcessorBean"/>
+        </component>
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Response From #[flowVars[AS2Constants.VAR_TARGET_SYSTEM]]  with Original Message ID #[flowVars[AS2Constants.VAR_ORGNL_MESSAGE_ID]] is:  #[flowVars[AS2Constants.VAR_DISPOSITION]]" processState="200009230" doc:name="Log - Response from Target System"/>
+
+    </sub-flow>
+    
+    <sub-flow name="subWriteToFile" doc:description="this flow writes the content to backup file using the backup file properties">
+    	<set-variable variableName="#[AS2Constants.VAR_BACKUP_FILE_EXTN]" value="${connect.as2.backup.file.extension}" doc:name="set backup file extn" doc:description="sets the backup file description"/>
+    	<!-- <set-variable variableName="#[AS2Constants.VAR_BACKUP_FILE_PREFIX]" value="${connect.as2.backup.file.prefix.inbound}" doc:name="sets the backup file prefix" doc:description="sets the backup file extension"/> -->
+        <set-variable variableName="#[AS2Constants.VAR_BACKUP_FILE_PATH]" value="#[flowVars[AS2Constants.VAR_BACKUP_FOLDER]]" doc:name="build backup file path" doc:description="build backup file path"/>
+        <choice doc:name="Choice - Check Reference Number">
+            <when expression="#[flowVars[ConnectConstants.REFERENCE_NUMBER] != null]">
+                <set-variable variableName="#[AS2Constants.VAR_BACKUP_FILE_NAME]" value="#[flowVars[AS2Constants.VAR_BACKUP_FILE_PREFIX]]-#[flowVars[ConnectConstants.REFERENCE_NUMBER]]-#[flowVars[ConnectConstants.VAR_MESSAGE_ID]]-#[ConnectUtils.getCurrentTimeAsString()].#[flowVars[AS2Constants.VAR_BACKUP_FILE_EXTN]]" doc:name="build backup file name for send flow" doc:description="build backup file name"/>
+            </when>
+			<otherwise>
+				<set-variable variableName="#[AS2Constants.VAR_BACKUP_FILE_NAME]" value="#[flowVars[AS2Constants.VAR_BACKUP_FILE_PREFIX]]-#[flowVars[ConnectConstants.VAR_MESSAGE_ID]]-#[ConnectUtils.getCurrentTimeAsString()].#[flowVars[AS2Constants.VAR_BACKUP_FILE_EXTN]]" doc:name="build backup file name for receive flow" doc:description="build backup file name"/>
+			</otherwise>            
+        </choice>
+
+        <connectlogger:info config-ref="Connectlogger__Configuration" logMessage="Archiving &quot;#[flowVars[AS2Constants.VAR_DIRECTION]]&quot; content to: #[flowVars[AS2Constants.VAR_BACKUP_FILE_PATH]]/#[flowVars[AS2Constants.VAR_BACKUP_FILE_NAME]]" processState="102009500" doc:name="Log - Message Archiving"/>
+
+        <file:outbound-endpoint responseTimeout="10000" doc:name="writeToFile" outputPattern="#[flowVars[AS2Constants.VAR_BACKUP_FILE_NAME]]" path="#[flowVars[AS2Constants.VAR_BACKUP_FILE_PATH]]"/>
+    </sub-flow>
+
+</mule>

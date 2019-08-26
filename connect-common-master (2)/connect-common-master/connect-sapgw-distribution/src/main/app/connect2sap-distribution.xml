@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:connectlogger="http://www.mulesoft.org/schema/mule/connectlogger" xmlns:sap="http://www.mulesoft.org/schema/mule/sap" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/connectlogger http://www.mulesoft.org/schema/mule/connectlogger/current/mule-connectlogger.xsd
+http://www.mulesoft.org/schema/mule/sap http://www.mulesoft.org/schema/mule/sap/current/mule-sap.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="sap2connect-servicesFlow" processingStrategy="synchronous">
+        <jms:inbound-endpoint queue="${connect.connect2sap.distribution.common.queue}" connector-ref="Sap2connectActiveMQConn" responseTimeout="20000" doc:name="Receive Enterprise Message And Process"/>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: Received message for connect2sap services ::" processState="102010200" doc:name="Connectlogger"/>
+
+        <expression-component doc:name="Expression"><![CDATA[payload.getEnterpriseHeader().setComponent("connect-sapgw-services");
+flowVars[ConnectConstants.VAR_ENTERPRISE_MESSAGE]= payload;
+flowVars[ConnectConstants.VAR_MESSAGE_ID] = payload.getEnterpriseHeader().getMessageId();
+flowVars[ConnectConstants.VAR_MESSAGE_SOURCE]  = payload.getEnterpriseHeader().getMessageSource();
+flowVars[ConnectConstants.VAR_MESSAGE_ACTION] = payload.getEnterpriseHeader().getAction();
+flowVars[ConnectConstants.VAR_SERVICE_NAME]= payload.getEnterpriseHeader().getServiceName();
+flowVars[ConnectConstants.VAR_TARGET_SYSTEM]= payload.getEnterpriseHeader().getTargetSystem();
+flowVars[ConnectConstants.VAR_SOURCE_SYSTEM]= payload.getEnterpriseHeader().getSourceSystem();
+flowVars[ConnectConstants.VAR_COMMUNICATION]= payload.getEnterpriseHeader().getCommunication();
+flowVars[ConnectConstants.VAR_PRIORITY]= payload.getEnterpriseHeader().getPriority();
+
+]]></expression-component>
+
+        <component class="com.redn.connect.distribution.processor.SaveCEMProperties" doc:name="SaveCEMProperties"/>
+        <enricher target="#[flowVars.logCEM]" doc:name="Message Enricher">
+            <connectlogger:info config-ref="ConnectloggerConn" logMessage="#[ConnectUtils.jaxbCEMObjectToXML(payload)]" processState="102010960" doc:name="Connectlogger-Log CEM"/>
+        </enricher>
+
+        
+        <component doc:name="Extract Payload without XML prolog">
+            <spring-object bean="SpringRemovePrologBean"/>
+        </component>
+        <set-variable variableName="gmInstanceFromMsg" value="#[xpath3('//IDOC/EDI_DC40/RCVPOR')]-#[xpath3('//IDOC/EDI_DC40/RCVPRN')]" doc:name="Variable"/>
+        <set-variable variableName="sourceSystemName" value="#[xpath3('//IDOC/EDI_DC40/MESCOD')]" doc:name="sourceSystem"/>
+        <sap:xml-to-idoc doc:name="XML to SAP IDoc"/>
+        <choice doc:name="ChkSourceSystem">
+            <when expression="#[flowVars.sourceSystemName == 'HPI']">
+                <connectlogger:info config-ref="ConnectloggerConn" logMessage=":::::::::::: when incoming message is from HPI::::::::::::::::::::::" processState="102010300" doc:name="HPIConnectlogger"/>
+                <component class="com.redn.connect.distribution.processor.GmInstanceIdentifier" doc:name="GmInstanceIdentifier"/>
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.sapGmInstanceName == 'gm2']">
+                        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":::::::::::::::::Push Message on to GM 2 Instance::::::::::::::::::::" processState="102010310" doc:name="ConnectloggerGM2"/>
+                        <flow-ref name="sap2connect-gm2-servicesFlow" doc:name="sap2connect-gm2-servicesFlow"/>
+                    </when>
+                    <otherwise>
+                        <connectlogger:info config-ref="ConnectloggerConn" logMessage="::::::::::::Push Message to GM 1 Instance" processState="102010320" doc:name="ConnectloggerGM1"/>
+                        <flow-ref name="sap2connect-servicesFlow1" doc:name="sap2connect-servicesFlow1"/>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <connectlogger:info config-ref="ConnectloggerConn" logMessage=":::::::::::: when incoming message is NOT from HPI::::::::::::::::::::::" processState="102010400" doc:name="Connectlogger"/>
+                <flow-ref name="sap2connect-servicesFlow1" doc:name="sap2connect-servicesFlow1"/>
+            </otherwise>
+        </choice>
+
+        <exception-strategy ref="global-exception-handlerChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    <flow name="sap2connect-servicesFlow1">
+        <sap:outbound-endpoint connector-ref="SAPDistributionsConn" type="idoc" outputXml="true" responseTimeout="10000" doc:name="send idoc to SAP GM1">
+            <reconnect frequency="${connect.sapgw.sapinstance.distribution.reconnection.frequency}" count="${connect.sapgw.sapinstance.distribution.reconnection.attempts}"/>
+        </sap:outbound-endpoint>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: connect2sap distribution GM 1 message processing completed successfully :: " processState="102010230" doc:name="Connectlogger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <connectlogger:error config-ref="ConnectloggerConn" logMessage=":: Error while connecting to SAP services ::" processState="500016211" doc:name="Connectlogger"/>
+            <flow-ref name="SAP-exception-handlerSub_Flow" doc:name="SAP-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="sap2connect-gm2-servicesFlow">
+        <sap:outbound-endpoint connector-ref="SAPDistributionsConnGM2" type="idoc" outputXml="true" responseTimeout="10000" doc:name="send idoc to SAP GM2">
+            <reconnect frequency="${connect.sapgw.sapinstance.distribution.gm2.reconnection.frequency}" count="${connect.sapgw.sapinstance.distribution.gm2.reconnection.attempts}"/>
+        </sap:outbound-endpoint>
+        <connectlogger:info config-ref="ConnectloggerConn" logMessage=":: connect2sap distribution GM 2 message processing completed successfully :: " processState="102010240" doc:name="Connectlogger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <connectlogger:error config-ref="ConnectloggerConn" logMessage=":: Error while connecting to SAP services ::" processState="500016211" doc:name="Connectlogger"/>
+            <flow-ref name="SAP-exception-handlerSub_Flow" doc:name="SAP-exception-handlerSub_Flow"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

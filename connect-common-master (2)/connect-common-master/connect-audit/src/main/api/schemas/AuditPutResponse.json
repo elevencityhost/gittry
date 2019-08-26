@@ -1,0 +1,43 @@
+{
+	"type":"object",
+	"$schema": "http://json-schema.org/draft-03/schema",
+	"id": "http://jsonschema.net",
+	"required":false,
+	"properties":{
+		"auditPutResponse": {
+			"type":"array",
+			"id": "http://jsonschema.net/auditPutResponse",
+			"required":false,
+			"items":
+				{
+					"type":"object",
+					"id": "http://jsonschema.net/auditPutResponse",
+					"required":false,
+					"properties":{
+						"system_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditPutResponse/system_id",
+							"required":false
+						},
+						"comment": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditPutResponse/comment",
+							"required":false
+						},
+						"prop_name": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditPutResponse/prop_name",
+							"required":false
+						},
+						"status_id": {
+							"type":"string",
+							"id": "http://jsonschema.net/auditPutResponse/status_id",
+							"required":true
+						}
+					}
+				}
+			
+
+		}
+	}
+}

@@ -1,0 +1,15 @@
+{
+    "auditPostRequest": 
+		{
+			"interface_id": "LEN001",
+			"job_id": "TestCaseEntrytest",
+			"prop_name": "wrong-property",
+			"prop_value": "300",
+			"status_id": "0",
+			"phase_id": "250",
+			"system_id": "2000",
+			"batch_counter":"3",
+			"external_id":"11",
+			"comment": "This is a Test Insert"
+		}
+}
